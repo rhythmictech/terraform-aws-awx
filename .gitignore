@@ -7,3 +7,7 @@
 
 # .tfvars files
 *.tfvars
+
+backend.tf
+backend.tfvars
+test/

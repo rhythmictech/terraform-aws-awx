@@ -2,7 +2,7 @@ module "database" {
   source  = "terraform-aws-modules/rds-aurora/aws"
   version = "~> 2.0"
 
-  name                            = "awx_postgres"
+  name                            = "awx-postgres"
 
   engine                          = "aurora-postgresql"
   engine_version                  = "10.7"
@@ -19,17 +19,14 @@ module "database" {
   db_parameter_group_name         = "default"
   db_cluster_parameter_group_name = "default"
 
-  enabled_cloudwatch_logs_exports = [
-    "audit",
-    "error",
-    "general",
-    "slowquery"
-  ]
+  # enabled_cloudwatch_logs_exports = [
+  #   "audit",
+  #   "error",
+  #   "general",
+  #   "slowquery"
+  # ]
 
-  tags = merge(
-    local.common_tags,
-    var.tags
-  )
+  tags = var.tags
 }
 
 
@@ -43,7 +40,6 @@ resource "tls_private_key" "ecs_root" {
 #   description = "ssh key for ec2-user user on ECS Instances"
 
 #   tags = merge(
-#     local.common_tags,
 #     var.tags,
 #     {
 #       "Name" = "awx-ecs-root-ssh-key"
@@ -58,7 +54,7 @@ resource "tls_private_key" "ecs_root" {
 
 module "ecs-cluster" {
   source                   = "github.com/rhythmictech/terraform-aws-ecs-cluster?ref=1.0.0"
-  name                     = "awx-ecs-cluster-${terraform.workspace}"
+  name                     = "awx-ecs-"
   instance_policy_document = data.aws_iam_policy_document.ecs-instance-policy-document.json
   vpc_id                   = var.vpc_id
   alb_subnet_ids           = var.public_subnets
@@ -78,7 +74,7 @@ data "aws_iam_policy_document" "ecs-instance-policy-document" {
     ]
 
     resources = [
-      "arn:aws:rds-db:${local.region}:${local.account_id}:dbuser:${module.database.instance-id}/${module.database.username}",
+      "arn:aws:rds-db:${local.region}:${local.account_id}:dbuser:${module.database.this_rds_cluster_id}/${module.database.this_rds_cluster_master_username}",
     ]
   }
 }
@@ -107,7 +103,7 @@ resource "aws_security_group_rule" "ecs_alb_egress" {
   from_port = 0
   to_port = 0
   protocol = "-1"
-  cidr_blocks = [var.cidr_block[terraform.workspace]]
+  cidr_blocks = [var.cidr_block]
 }
 
 resource "aws_security_group_rule" "ecs_ec2_ingress_from_alb" {

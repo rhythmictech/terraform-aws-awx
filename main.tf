@@ -8,19 +8,19 @@ module "database" {
   source  = "terraform-aws-modules/rds-aurora/aws"
   version = "~> 2.0"
 
-  name                            = "awx-postgres"
+  name = "awx-postgres"
 
-  engine                          = "aurora-postgresql"
-  engine_version                  = "10.7"
+  engine         = "aurora-postgresql"
+  engine_version = "10.7"
 
-  vpc_id                          = var.vpc_id
-  subnets                         = var.database_subnets
+  vpc_id  = var.vpc_id
+  subnets = var.database_subnets
 
-  allowed_security_groups         = [] #TODO
-  allowed_security_groups_count   = 0 #TODO
-  instance_type                   = var.db_instance_type
-  storage_encrypted               = true
-  apply_immediately               = true
+  allowed_security_groups       = [] #TODO
+  allowed_security_groups_count = 0  #TODO
+  instance_type                 = var.db_instance_type
+  storage_encrypted             = true
+  apply_immediately             = true
 
   db_parameter_group_name         = "default.aurora-postgresql10"
   db_cluster_parameter_group_name = "default.aurora-postgresql10"
@@ -87,45 +87,45 @@ data "aws_iam_policy_document" "ecs-instance-policy-document" {
 
 resource "aws_security_group_rule" "ecs_alb_ingress_80" {
   security_group_id = module.ecs-cluster.alb-sg-id
-  type = "ingress"
-  from_port = 80
-  to_port = 80
-  protocol = "tcp"
-  cidr_blocks = ["0.0.0.0/0"]
+  type              = "ingress"
+  from_port         = 80
+  to_port           = 80
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
 }
 
 resource "aws_security_group_rule" "ecs_alb_ingress_443" {
   security_group_id = module.ecs-cluster.alb-sg-id
-  type = "ingress"
-  from_port = 443
-  to_port = 443
-  protocol = "tcp"
-  cidr_blocks = ["0.0.0.0/0"]
+  type              = "ingress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
 }
 
 resource "aws_security_group_rule" "ecs_alb_egress" {
   security_group_id = module.ecs-cluster.alb-sg-id
-  type = "egress"
-  from_port = 0
-  to_port = 0
-  protocol = "-1"
-  cidr_blocks = [var.cidr_block]
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = [var.cidr_block]
 }
 
 resource "aws_security_group_rule" "ecs_ec2_ingress_from_alb" {
-  security_group_id = module.ecs-cluster.ec2-sg-id
-  type = "ingress"
-  from_port = 0
-  to_port = 0
-  protocol = "-1"
+  security_group_id        = module.ecs-cluster.ec2-sg-id
+  type                     = "ingress"
+  from_port                = 0
+  to_port                  = 0
+  protocol                 = "-1"
   source_security_group_id = module.ecs-cluster.alb-sg-id
 }
 
 resource "aws_security_group_rule" "ecs_ec2_egress" {
   security_group_id = module.ecs-cluster.ec2-sg-id
-  type = "egress"
-  from_port = 0
-  to_port = 0
-  protocol = "-1"
-  cidr_blocks = ["0.0.0.0/0"]
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
 }

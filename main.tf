@@ -1,3 +1,9 @@
+resource "aws_rds_cluster_parameter_group" "default" {
+  name        = "default"
+  family      = "aurora-postgresql10"
+  description = "RDS default cluster parameter group"
+}
+
 module "database" {
   source  = "terraform-aws-modules/rds-aurora/aws"
   version = "~> 2.0"
@@ -16,8 +22,8 @@ module "database" {
   storage_encrypted               = true
   apply_immediately               = true
 
-  db_parameter_group_name         = "default"
-  db_cluster_parameter_group_name = "default"
+  db_parameter_group_name         = "default.aurora-postgresql10"
+  db_cluster_parameter_group_name = "default.aurora-postgresql10"
 
   # enabled_cloudwatch_logs_exports = [
   #   "audit",
@@ -53,7 +59,7 @@ resource "tls_private_key" "ecs_root" {
 # }
 
 module "ecs-cluster" {
-  source                   = "github.com/rhythmictech/terraform-aws-ecs-cluster?ref=1.0.0"
+  source                   = "github.com/rhythmictech/terraform-aws-ecs-cluster?ref=1.0.2"
   name                     = "awx-ecs-"
   instance_policy_document = data.aws_iam_policy_document.ecs-instance-policy-document.json
   vpc_id                   = var.vpc_id

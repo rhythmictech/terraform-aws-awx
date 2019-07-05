@@ -1,0 +1,80 @@
+[
+    {
+        "name": "awx-web",
+        "image": "ansible/awx_web:6.0.0",
+        "user": "root",
+        "essential": true,
+        "networkMode": "awsvpc",
+        "portMappings": [
+            {
+                "containerPort": 80,
+                "hostPort": 80
+            }
+        ],
+        "mountPoints": [
+            {
+                "containerPath": "/etc/tower/SECRET_KEY",
+                "sourceVolume": "TmpAwxcomposeSecret_Key"
+            },
+            {
+                "containerPath": "/etc/tower/conf.d/environment.sh",
+                "sourceVolume": "TmpAwxcomposeEnvironment_Sh"
+            },
+            {
+                "containerPath": "/etc/tower/conf.d/credentials.py",
+                "sourceVolume": "TmpAwxcomposeCredentials_Py"
+            }
+        ]
+    },
+    {
+        "name": "awx-task",
+        "image": "ansible/awx_task:6.0.0",
+        "user": "root",
+        "essential": true,
+        "networkMode": "awsvpc",
+        "mountPoints": [
+            {
+                "containerPath": "/etc/tower/SECRET_KEY",
+                "sourceVolume": "TmpAwxcomposeSecret_Key"
+            },
+            {
+                "containerPath": "/etc/tower/conf.d/environment.sh",
+                "sourceVolume": "TmpAwxcomposeEnvironment_Sh"
+            },
+            {
+                "containerPath": "/etc/tower/conf.d/credentials.py",
+                "sourceVolume": "TmpAwxcomposeCredentials_Py"
+            }
+        ]
+    },
+    {
+        "name": "awx-rabbitmq",
+        "image": "ansible/awx_rabbitmq:3.7.4",
+        "essential": true,
+        "networkMode": "awsvpc",
+        "environment": [
+            {
+                "name": "RABBITMQ_DEFAULT_VHOST",
+                "value": "awx"
+            },
+            {
+                "name": "RABBITMQ_DEFAULT_USER",
+                "value": "guest"
+            },
+            {
+                "name": "RABBITMQ_DEFAULT_PASS",
+                "value": "awxpass"
+            },
+            {
+                "name": "RABBITMQ_ERLANG_COOKIE",
+                "value": "cookiemonster"
+            }
+        ]
+    },
+    {
+        "name": "awx-memcached",
+        "image": "memcached:alpine",
+        "essential": true,
+        "networkMode": "awsvpc"
+    }
+]

@@ -1,3 +1,7 @@
+# =============================================
+# ECS 
+# =============================================
+
 data "local_file" "ecs_container_definitions" {
   filename = "${path.module}/service.json"
 }
@@ -34,6 +38,58 @@ resource "aws_ecs_service" "awx" {
 
 }
 
+module "ecs-cluster" {
+  source                   = "github.com/rhythmictech/terraform-aws-ecs-cluster?ref=1.0.2"
+  name                     = "awx-ecs-"
+  instance_policy_document = data.aws_iam_policy_document.ecs-instance-policy-document.json
+  vpc_id                   = var.vpc_id
+  alb_subnet_ids           = var.public_subnets
+  instance_subnet_ids      = var.private_subnets
+  ssh_pubkey               = tls_private_key.ecs_root.public_key_openssh
+  instance_type            = "t3.micro"
+  region                   = local.region
+  min_instances            = 2
+  max_instances            = 8
+  desired_instances        = 2
+}
+
+resource "tls_private_key" "ecs_root" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+# resource "aws_secretsmanager_secret" "ecs_root_ssh_key" {
+#   name_prefix = "awx-ecs-ssh-key-${var.env}-"
+#   description = "ssh key for ec2-user user on ECS Instances"
+
+#   tags = merge(
+#     var.tags,
+#     {
+#       "Name" = "awx-ecs-root-ssh-key"
+#     },
+#   )
+# }
+
+# resource "aws_secretsmanager_secret_version" "ecs-root-ssh-key-value" {
+#   secret_id     = aws_secretsmanager_secret.ecs_root_ssh_key.id
+#   secret_string = tls_private_key.ecs_root.private_key_pem
+# }
+
+data "aws_iam_policy_document" "ecs-instance-policy-document" {
+  statement {
+    actions = [
+      "rds-db:connect",
+    ]
+
+    resources = [
+      "arn:aws:rds-db:${local.region}:${local.account_id}:dbuser:${module.database.this_rds_cluster_id}/${module.database.this_rds_cluster_master_username}",
+    ]
+  }
+}
+
+# =============================================
+#  RDS
+# =============================================
 
 resource "aws_rds_cluster_parameter_group" "default" {
   name        = "default"
@@ -73,54 +129,9 @@ module "database" {
 }
 
 
-resource "tls_private_key" "ecs_root" {
-  algorithm = "RSA"
-  rsa_bits  = 4096
-}
-
-# resource "aws_secretsmanager_secret" "ecs_root_ssh_key" {
-#   name_prefix = "awx-ecs-ssh-key-${var.env}-"
-#   description = "ssh key for ec2-user user on ECS Instances"
-
-#   tags = merge(
-#     var.tags,
-#     {
-#       "Name" = "awx-ecs-root-ssh-key"
-#     },
-#   )
-# }
-
-# resource "aws_secretsmanager_secret_version" "ecs-root-ssh-key-value" {
-#   secret_id     = aws_secretsmanager_secret.ecs_root_ssh_key.id
-#   secret_string = tls_private_key.ecs_root.private_key_pem
-# }
-
-module "ecs-cluster" {
-  source                   = "github.com/rhythmictech/terraform-aws-ecs-cluster?ref=1.0.2"
-  name                     = "awx-ecs-"
-  instance_policy_document = data.aws_iam_policy_document.ecs-instance-policy-document.json
-  vpc_id                   = var.vpc_id
-  alb_subnet_ids           = var.public_subnets
-  instance_subnet_ids      = var.private_subnets
-  ssh_pubkey               = tls_private_key.ecs_root.public_key_openssh
-  instance_type            = "t3.micro"
-  region                   = local.region
-  min_instances            = 2
-  max_instances            = 8
-  desired_instances        = 2
-}
-
-data "aws_iam_policy_document" "ecs-instance-policy-document" {
-  statement {
-    actions = [
-      "rds-db:connect",
-    ]
-
-    resources = [
-      "arn:aws:rds-db:${local.region}:${local.account_id}:dbuser:${module.database.this_rds_cluster_id}/${module.database.this_rds_cluster_master_username}",
-    ]
-  }
-}
+# =============================================
+#  INGRESS-EGRESSS
+# =============================================
 
 resource "aws_security_group_rule" "ecs_alb_ingress_80" {
   security_group_id = module.ecs-cluster.alb-sg-id

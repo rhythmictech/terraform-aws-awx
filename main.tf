@@ -1,3 +1,40 @@
+data "local_file" "ecs_container_definitions" {
+  filename = "${path.module}/service.json"
+}
+
+resource "aws_ecs_task_definition" "awx" {
+  family                = "awx-service"
+  container_definitions = data.local_file.ecs_container_definitions.content
+
+  volume {
+    name      = "TmpAwxcomposeSecret_Key"
+    host_path = "/tmp/awxcompose/SECRET_KEY"
+  }
+  volume {
+    name      = "TmpAwxcomposeEnvironment_Sh"
+    host_path = "/tmp/awxcompose/environment.sh"
+  }
+  volume {
+    name      = "TmpAwxcomposeCredentials_Py"
+    host_path = "/tmp/awxcompose/credentials.py"
+  }
+
+  tags = var.tags
+}
+
+resource "aws_ecs_service" "awx" {
+  name            = "awx"
+  task_definition = aws_ecs_task_definition.awx.arn
+
+  load_balancer {
+    target_group_arn = module.ecs-cluster.alb-arn
+    container_name   = "awx-web"
+    container_port   = 8080
+  }
+
+}
+
+
 resource "aws_rds_cluster_parameter_group" "default" {
   name        = "default"
   family      = "aurora-postgresql10"
@@ -68,9 +105,9 @@ module "ecs-cluster" {
   ssh_pubkey               = tls_private_key.ecs_root.public_key_openssh
   instance_type            = "t3.micro"
   region                   = local.region
-  min_instances            = 0
-  max_instances            = 0
-  desired_instances        = 0
+  min_instances            = 2
+  max_instances            = 8
+  desired_instances        = 2
 }
 
 data "aws_iam_policy_document" "ecs-instance-policy-document" {

@@ -1,57 +1,65 @@
 [
     {
+        "name": "secret-sidecar",
+        "image": "312594956781.dkr.ecr.us-east-1.amazonaws.com/awx:localhost",
+        "essential": true,
+        "memory": 512,
+        "mountPoints": [
+            {
+                "sourceVolume": "secrets",
+                "containerPath": "/etc/tower"
+            }
+        ]
+    },
+    {
         "name": "awx-web",
         "image": "ansible/awx_web:6.0.0",
+        "hostname": "awxweb",
         "user": "root",
         "essential": true,
-        "networkMode": "awsvpc",
+        "memory": 1024,
         "portMappings": [
             {
-                "containerPort": 80,
+                "containerPort": 8052,
                 "hostPort": 80
             }
         ],
         "mountPoints": [
             {
-                "containerPath": "/etc/tower/SECRET_KEY",
-                "sourceVolume": "TmpAwxcomposeSecret_Key"
-            },
-            {
-                "containerPath": "/etc/tower/conf.d/environment.sh",
-                "sourceVolume": "TmpAwxcomposeEnvironment_Sh"
-            },
-            {
-                "containerPath": "/etc/tower/conf.d/credentials.py",
-                "sourceVolume": "TmpAwxcomposeCredentials_Py"
+                "sourceVolume": "secrets",
+                "containerPath": "/etc/tower",
+                "readOnly": true
             }
         ]
     },
     {
         "name": "awx-task",
         "image": "ansible/awx_task:6.0.0",
+        "hostname": "awx",
         "user": "root",
         "essential": true,
-        "networkMode": "awsvpc",
+        "cpu": 2048,
+        "memory": 2000,
         "mountPoints": [
             {
-                "containerPath": "/etc/tower/SECRET_KEY",
-                "sourceVolume": "TmpAwxcomposeSecret_Key"
-            },
-            {
-                "containerPath": "/etc/tower/conf.d/environment.sh",
-                "sourceVolume": "TmpAwxcomposeEnvironment_Sh"
-            },
-            {
-                "containerPath": "/etc/tower/conf.d/credentials.py",
-                "sourceVolume": "TmpAwxcomposeCredentials_Py"
+                "sourceVolume": "secrets",
+                "containerPath": "/etc/tower",
+                "readOnly": true
             }
         ]
     },
     {
         "name": "awx-rabbitmq",
         "image": "ansible/awx_rabbitmq:3.7.4",
+        "hostname": "rabbitmq",
         "essential": true,
-        "networkMode": "awsvpc",
+        "memory": 1024,
+        "portMappings": [
+            {
+                "containerPort": 5672,
+                "hostPort": 5672
+            }
+        ],
         "environment": [
             {
                 "name": "RABBITMQ_DEFAULT_VHOST",
@@ -74,7 +82,14 @@
     {
         "name": "awx-memcached",
         "image": "memcached:alpine",
+        "hostname": "memcached",
         "essential": true,
-        "networkMode": "awsvpc"
+        "memory": 1024,
+        "portMappings": [
+            {
+                "containerPort": 11211,
+                "hostPort": 11211
+            }
+        ]
     }
 ]

@@ -34,7 +34,7 @@ resource "aws_ecs_service" "awx" {
 
   load_balancer {
     target_group_arn = aws_lb_target_group.awx.arn
-    container_name   = "awx-web"
+    container_name   = "awxweb"
     container_port   = 8052
   }
 

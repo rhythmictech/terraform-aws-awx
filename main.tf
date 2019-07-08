@@ -110,6 +110,11 @@ resource "aws_iam_role_policy_attachment" "ecs-service-role-attachment" {
   role = "${aws_iam_role.ecs-service-role.name}"
 }
 
+resource "aws_iam_role_policy_attachment" "ecs-service-role-ec2-read-only" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
+  role = "${aws_iam_role.ecs-service-role.name}"
+}
+
 # resource "aws_secretsmanager_secret" "ecs_root_ssh_key" {
 #   name_prefix = "awx-ecs-ssh-key-${var.env}-"
 #   description = "ssh key for ec2-user user on ECS Instances"
@@ -230,4 +235,14 @@ resource "aws_security_group_rule" "ecs_ec2_egress" {
   to_port = 0
   protocol = "-1"
   cidr_blocks = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "rds_ingress" {
+  type            = "ingress"
+  description     = "Allow ECS RDS Communication"
+  from_port       = 5432
+  to_port         = 5432
+  protocol        = "tcp"
+  security_group_id = module.database.this_security_group_id
+  source_security_group_id = module.ecs-cluster.ec2-sg-id
 }

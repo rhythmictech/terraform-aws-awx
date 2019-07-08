@@ -5,6 +5,7 @@ provider "aws" {
 module "awx" {
   source = "../"
 
+  cluster_name            = "awx-ssl"
   db_instance_type        = var.db_instance_type
   vpc_id                  = var.vpc_id
   cidr_block              = var.cidr_block

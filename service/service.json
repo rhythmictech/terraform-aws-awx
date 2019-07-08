@@ -1,19 +1,7 @@
 [
     {
-        "name": "secret-sidecar",
-        "image": "312594956781.dkr.ecr.us-east-1.amazonaws.com/awx-secret-sidecar:v0.0.4",
-        "essential": true,
-        "memory": 512,
-        "mountPoints": [
-            {
-                "sourceVolume": "secrets",
-                "containerPath": "/etc/tower"
-            }
-        ]
-    },
-    {
         "name": "awxweb",
-        "image": "ansible/awx_web:6.0.0",
+        "image": "sblack4/awx_web:latest",
         "hostname": "awxweb",
         "links": [
             "awx:awx",
@@ -29,17 +17,38 @@
                 "hostPort": 80
             }
         ],
-        "mountPoints": [
+        "environment": [
             {
-                "sourceVolume": "secrets",
-                "containerPath": "/etc/tower",
-                "readOnly": true
+                "name": "DATABASE_USER",
+                "value": "${ database_username }"
+            }, 
+            {
+                "name": "DATABASE_HOST",
+                "value": "${ database_host }"
+            },
+            {
+                "name": "AWX_ADMIN_USER",
+                "valueFrom": "${ awx_admin_username }"
+            }
+        ],
+        "secrets": [
+            {
+                "name": "DATABASE_PASSWORD",
+                "valueFrom": "${ database_password_arn }"
+            },
+            {
+                "name": "SECRET_KEY",
+                "valueFrom": "${ awx_secret_key }"
+            }, 
+            {
+                "name": "AWX_ADMIN_PASSWORD",
+                "valueFrom": "${ awx_admin_password }"
             }
         ]
     },
     {
         "name": "awx",
-        "image": "ansible/awx_task:6.0.0",
+        "image": "sblack4/awx_task:latest",
         "hostname": "awx",
         "links": [
             "rabbitmq:rabbitmq",
@@ -54,11 +63,32 @@
                 "containerPort": 8052
             }
         ],
-        "mountPoints": [
+        "environment": [
             {
-                "sourceVolume": "secrets",
-                "containerPath": "/etc/tower",
-                "readOnly": true
+                "name": "DATABASE_USER",
+                "value": "${ database_username }"
+            }, 
+            {
+                "name": "DATABASE_HOST",
+                "value": "${ database_host }"
+            },
+            {
+                "name": "AWX_ADMIN_USER",
+                "valueFrom": "${ awx_admin_username }"
+            }
+        ],
+        "secrets": [
+            {
+                "name": "DATABASE_PASSWORD",
+                "valueFrom": "${ database_password_arn }"
+            },
+            {
+                "name": "SECRET_KEY",
+                "valueFrom": "${ awx_secret_key }"
+            }, 
+            {
+                "name": "AWX_ADMIN_PASSWORD",
+                "valueFrom": "${ awx_admin_password }"
             }
         ]
     },

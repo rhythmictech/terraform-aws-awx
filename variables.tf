@@ -9,10 +9,11 @@ locals {
   region     = data.aws_region.current.name
   account_id = data.aws_caller_identity.current.account_id
 
-  common_tags = {
-    env               = var.env
-    terraform_managed = "true"
-  }
+  common_tags = merge({
+      env               = var.env
+      terraform_managed = "true"
+    }, var.tags
+  )
 }
 
 variable "tags" {
@@ -81,6 +82,26 @@ variable "cluster_name" {
   default = "awx"
 }
 
+variable "alb_ssl_certificate_arn" {
+  description = "ARN for an SSL certificate stored in Certificate Manager to be used with AWX's ALB"
+  type        = string
+}
+
+variable "awx_secret_key" {
+  description = "secret key for awx, see docs"
+  default     = "awxsecret"
+}
+
+variable "awx_admin_username" {
+  default = "admin"
+}
+
+variable "awx_admin_password" {
+  default = "awspassword"
+}
+
+# ECS 
+
 variable "ecs_instance_type" {
   description = "Instance type (size) for the EC2 instances which comprise the ECS cluster"
   type        = string
@@ -99,7 +120,3 @@ variable "ecs_desired_instances" {
   default = 2
 }
 
-variable "alb_ssl_certificate_arn" {
-  description = "ARN for an SSL certificate stored in Certificate Manager to be used with AWX's ALB"
-  type        = string
-}

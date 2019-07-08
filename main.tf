@@ -2,20 +2,30 @@
 # ECS - Task/Service/EC2/ALB
 # =============================================
 
-data "local_file" "ecs_container_definitions" {
-  filename = "${path.module}/service/service.json"
+data "template_file" "ecs_container_definitions" {
+  template = "${path.module}/service/service.json"
+
+  vars = {
+    awx_secret_key     = var.awx_secret_key
+    awx_admin_username = var.awx_admin_username
+    awx_admin_password = var.awx_admin_password
+
+    database_username     = var.db_username
+    database_password_arn = module.db_password_secret.secret.arn
+    database_host         = module.database.this_rds_cluster_endpoint
+  }
 }
 
 resource "aws_ecs_task_definition" "awx" {
   # the ecs module appends "-cluster" to the name
   family                = "${var.cluster_name}-cluster"
-  container_definitions = data.local_file.ecs_container_definitions.content
+  container_definitions = data.template_file.ecs_container_definitions.rendered
 
   volume {
     name = "secrets"
   }
 
-  tags = var.tags
+  tags = local.common_tags
 }
 
 resource "aws_ecs_service" "awx" {
@@ -25,7 +35,10 @@ resource "aws_ecs_service" "awx" {
   task_definition = aws_ecs_task_definition.awx.arn
   desired_count   = 1
   iam_role        = aws_iam_role.ecs-service-role.arn
-  depends_on      = [aws_iam_role.ecs-service-role]
+  depends_on = [
+    aws_iam_role.ecs-service-role,
+    module.ecs-cluster
+  ]
 
   load_balancer {
     target_group_arn = aws_lb_target_group.awx.arn
@@ -33,15 +46,38 @@ resource "aws_ecs_service" "awx" {
     container_port   = 8052
   }
 
-  tags = var.tags
+  tags = local.common_tags
 }
 
+module "ecs-cluster" {
+  source                   = "github.com/rhythmictech/terraform-aws-ecs-cluster?ref=1.0.3"
+  name                     = var.cluster_name
+  instance_policy_document = data.aws_iam_policy_document.ecs-instance-policy-document.json
+  vpc_id                   = var.vpc_id
+  alb_subnet_ids           = var.public_subnets
+  instance_subnet_ids      = var.private_subnets
+  ssh_pubkey               = tls_private_key.ecs_root.public_key_openssh
+  instance_type            = var.ecs_instance_type
+  region                   = local.region
+  min_instances            = var.ecs_min_instances
+  max_instances            = var.ecs_max_instances
+  desired_instances        = var.ecs_desired_instances
+
+  tags = local.common_tags
+}
+
+# ALB
+
 resource "aws_lb_target_group" "awx" {
-  name        = "${var.cluster_name}-target-group"
+  name_prefix = substr("${var.cluster_name}-tgtgrp", 0, 6)
   port        = 8052
   protocol    = "HTTP"
   target_type = "instance"
   vpc_id      = var.vpc_id
+
+  lifecycle {
+    create_before_destroy = true
+  }
 
   health_check {
     interval            = 10
@@ -49,12 +85,16 @@ resource "aws_lb_target_group" "awx" {
     healthy_threshold   = 2
     unhealthy_threshold = 2
   }
+
+  tags = local.common_tags
 }
 
 resource "aws_lb_listener" "awx" {
   load_balancer_arn = module.ecs-cluster.alb-arn
   port              = 443
   protocol          = "HTTPS"
+  certificate_arn   = var.alb_ssl_certificate_arn
+  depends_on        = [aws_lb_target_group.awx]
 
   default_action {
     type             = "forward"
@@ -78,23 +118,6 @@ resource "aws_lb_listener" "https_redirect" {
   }
 }
 
-module "ecs-cluster" {
-  source                   = "github.com/rhythmictech/terraform-aws-ecs-cluster?ref=1.0.3"
-  name                     = var.cluster_name
-  instance_policy_document = data.aws_iam_policy_document.ecs-instance-policy-document.json
-  vpc_id                   = var.vpc_id
-  alb_subnet_ids           = var.public_subnets
-  instance_subnet_ids      = var.private_subnets
-  ssh_pubkey               = tls_private_key.ecs_root.public_key_openssh
-  instance_type            = var.ecs_instance_type
-  region                   = local.region
-  min_instances            = var.ecs_min_instances
-  max_instances            = var.ecs_max_instances
-  desired_instances        = var.ecs_desired_instances
-
-  tags = var.tags
-}
-
 # =============================================
 # ECS - IAM/Secrets
 # =============================================
@@ -102,7 +125,7 @@ module "ecs-cluster" {
 # ECS Role 
 
 resource "aws_iam_role" "ecs-service-role" {
-  name = "awx-ecs"
+  name = "${var.cluster_name}-ecs-service-role"
 
   assume_role_policy = <<POLICY
 {
@@ -122,17 +145,17 @@ POLICY
 
 resource "aws_iam_role_policy_attachment" "ecs-service-role-attachment" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole"
-  role = "${aws_iam_role.ecs-service-role.name}"
+  role = aws_iam_role.ecs-service-role.name
 }
 
 resource "aws_iam_role_policy_attachment" "ecs-service-role-ec2-read-only" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
-  role = "${aws_iam_role.ecs-service-role.name}"
+  role = aws_iam_role.ecs-service-role.name
 }
 
 resource "aws_iam_role_policy_attachment" "ecs-service-role-route53-read-only" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonRoute53ReadOnlyAccess"
-  role = "${aws_iam_role.ecs-service-role.name}"
+  role = aws_iam_role.ecs-service-role.name
 }
 
 data "aws_iam_policy_document" "ecs-instance-policy-document" {
@@ -155,11 +178,11 @@ resource "tls_private_key" "ecs_root" {
 }
 
 resource "aws_secretsmanager_secret" "ecs_root_ssh_key" {
-  name_prefix = "awx-ecs-ssh-key-${var.env}-"
+  name_prefix = "${var.cluster_name}-ssh-key-${var.env}-"
   description = "ssh key for ec2-user user on ECS Instances"
 
   tags = merge(
-    var.tags,
+    local.common_tags,
     {
       "Name" = "awx-ecs-root-ssh-key"
     },
@@ -178,12 +201,23 @@ resource "aws_lb_listener_certificate" "awx" {
   certificate_arn = var.alb_ssl_certificate_arn
 }
 
+# AWX Component Secrets 
+
+module "db_password_secret" {
+  source = "github.com/rhythmictech/terraform-aws-secretsmanager-secret?ref=v0.0.2"
+
+  name = "${var.cluster_name}-db-password"
+  description = "RDS password for AWX ECS cluster ${var.cluster_name}"
+  value = var.db_password
+  tags = local.common_tags
+}
+
 # =============================================
 #  RDS
 # =============================================
 
 resource "aws_rds_cluster_parameter_group" "default" {
-  name = "default"
+  name = "${var.cluster_name}-default"
   family = "aurora-postgresql10"
   description = "RDS default cluster parameter group"
 }
@@ -192,7 +226,7 @@ module "database" {
   source = "terraform-aws-modules/rds-aurora/aws"
   version = "~> 2.0"
 
-  name = "awx-postgres"
+  name = "${var.cluster_name}-postgres"
   username = var.db_username
   password = var.db_password
 
@@ -208,12 +242,12 @@ module "database" {
   storage_encrypted = true
   apply_immediately = true
 
-  db_parameter_group_name = "default.aurora-postgresql10"
-  db_cluster_parameter_group_name = "default.aurora-postgresql10"
+  db_parameter_group_name = "${var.cluster_name}-default.aurora-postgresql10"
+  db_cluster_parameter_group_name = "${var.cluster_name}-default.aurora-postgresql10"
 
   # enabled_cloudwatch_logs_exports = []
 
-  tags = var.tags
+  tags = local.common_tags
 }
 
 

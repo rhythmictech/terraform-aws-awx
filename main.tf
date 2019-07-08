@@ -61,7 +61,7 @@ resource "aws_lb_listener" "awx" {
 }
 
 module "ecs-cluster" {
-  source                   = "github.com/rhythmictech/terraform-aws-ecs-cluster?ref=not-arm"
+  source                   = "github.com/rhythmictech/terraform-aws-ecs-cluster?ref=1.0.3"
   name                     = var.cluster-name
   instance_policy_document = data.aws_iam_policy_document.ecs-instance-policy-document.json
   vpc_id                   = var.vpc_id

@@ -2,17 +2,13 @@
 # ECS - Task/Service/EC2/ALB
 # =============================================
 
-variable "cluster-name" {
-  default = "awx"
-}
-
 data "local_file" "ecs_container_definitions" {
   filename = "${path.module}/service/service.json"
 }
 
 resource "aws_ecs_task_definition" "awx" {
   # the ecs module appends "-cluster" to the name
-  family                = "${var.cluster-name}-cluster"
+  family                = "${var.cluster_name}-cluster"
   container_definitions = data.local_file.ecs_container_definitions.content
 
   volume {
@@ -24,7 +20,7 @@ resource "aws_ecs_task_definition" "awx" {
 
 resource "aws_ecs_service" "awx" {
   # the ecs module appends "-cluster" to the name
-  name            = "${var.cluster-name}-cluster"
+  name            = "${var.cluster_name}-cluster"
   cluster         = module.ecs-cluster.cluster-name
   task_definition = aws_ecs_task_definition.awx.arn
   desired_count   = 1
@@ -41,13 +37,13 @@ resource "aws_ecs_service" "awx" {
 }
 
 resource "aws_lb_target_group" "awx" {
-  name        = "${var.cluster-name}-target-group"
+  name        = "${var.cluster_name}-target-group"
   port        = 8052
   protocol    = "HTTP"
   target_type = "instance"
   vpc_id      = var.vpc_id
 
-  health_check = {
+  health_check {
     interval            = 10
     path                = "/"
     healthy_threshold   = 2
@@ -68,17 +64,17 @@ resource "aws_lb_listener" "awx" {
 
 module "ecs-cluster" {
   source                   = "github.com/rhythmictech/terraform-aws-ecs-cluster?ref=1.0.3"
-  name                     = var.cluster-name
+  name                     = var.cluster_name
   instance_policy_document = data.aws_iam_policy_document.ecs-instance-policy-document.json
   vpc_id                   = var.vpc_id
   alb_subnet_ids           = var.public_subnets
   instance_subnet_ids      = var.private_subnets
   ssh_pubkey               = tls_private_key.ecs_root.public_key_openssh
-  instance_type            = "t3.large"
+  instance_type            = var.ecs_instance_type
   region                   = local.region
-  min_instances            = 2
-  max_instances            = 8
-  desired_instances        = 2
+  min_instances            = var.ecs_min_instances
+  max_instances            = var.ecs_max_instances
+  desired_instances        = var.ecs_desired_instances
 
   tags = var.tags
 }
@@ -118,6 +114,11 @@ resource "aws_iam_role_policy_attachment" "ecs-service-role-attachment" {
 
 resource "aws_iam_role_policy_attachment" "ecs-service-role-ec2-read-only" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
+  role = "${aws_iam_role.ecs-service-role.name}"
+}
+
+resource "aws_iam_role_policy_attachment" "ecs-service-role-route53-read-only" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonRoute53ReadOnlyAccess"
   role = "${aws_iam_role.ecs-service-role.name}"
 }
 
@@ -165,8 +166,8 @@ module "database" {
   version = "~> 2.0"
 
   name = "awx-postgres"
-  username = "awx"
-  password = "awxpassword"
+  username = var.db_username
+  password = var.db_password
 
   engine = "aurora-postgresql"
   engine_version = "10.7"
@@ -183,12 +184,7 @@ module "database" {
   db_parameter_group_name = "default.aurora-postgresql10"
   db_cluster_parameter_group_name = "default.aurora-postgresql10"
 
-  # enabled_cloudwatch_logs_exports = [
-  #   "audit",
-  #   "error",
-  #   "general",
-  #   "slowquery"
-  # ]
+  # enabled_cloudwatch_logs_exports = []
 
   tags = var.tags
 }

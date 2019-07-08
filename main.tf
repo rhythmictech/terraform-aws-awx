@@ -61,7 +61,7 @@ resource "aws_lb_listener" "awx" {
 }
 
 module "ecs-cluster" {
-  source                   = "github.com/rhythmictech/terraform-aws-ecs-cluster?ref=not-arm"
+  source                   = "github.com/rhythmictech/terraform-aws-ecs-cluster?ref=1.0.3"
   name                     = var.cluster-name
   instance_policy_document = data.aws_iam_policy_document.ecs-instance-policy-document.json
   vpc_id                   = var.vpc_id
@@ -107,6 +107,11 @@ POLICY
 
 resource "aws_iam_role_policy_attachment" "ecs-service-role-attachment" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole"
+  role = "${aws_iam_role.ecs-service-role.name}"
+}
+
+resource "aws_iam_role_policy_attachment" "ecs-service-role-ec2-read-only" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
   role = "${aws_iam_role.ecs-service-role.name}"
 }
 
@@ -230,4 +235,14 @@ resource "aws_security_group_rule" "ecs_ec2_egress" {
   to_port = 0
   protocol = "-1"
   cidr_blocks = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "rds_ingress" {
+  type            = "ingress"
+  description     = "Allow ECS RDS Communication"
+  from_port       = 5432
+  to_port         = 5432
+  protocol        = "tcp"
+  security_group_id = module.database.this_security_group_id
+  source_security_group_id = module.ecs-cluster.ec2-sg-id
 }

@@ -6,7 +6,6 @@ variable "cluster-name" {
   default = "awx"
 }
 
-
 data "local_file" "ecs_container_definitions" {
   filename = "${path.module}/service/service.json"
 }

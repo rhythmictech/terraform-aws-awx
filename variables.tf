@@ -64,12 +64,12 @@ variable "db_instance_type" {
 
 variable "db_username" {
   description = "Username of DB user which AWX will use"
-  default = "awx"
+  default     = "awx"
 }
 
 variable "db_password" {
   description = "Password for AWX DB user"
-  default = "password"
+  default     = "password"
 }
 
 # =============================================
@@ -83,8 +83,8 @@ variable "cluster_name" {
 
 variable "ecs_instance_type" {
   description = "Instance type (size) for the EC2 instances which comprise the ECS cluster"
-  type = string
-  default = "t3.medium"
+  type        = string
+  default     = "t3.medium"
 }
 
 variable "ecs_min_instances" {
@@ -97,4 +97,9 @@ variable "ecs_max_instances" {
 
 variable "ecs_desired_instances" {
   default = 2
+}
+
+variable "alb_ssl_certificate_arn" {
+  description = "ARN for an SSL certificate stored in Certificate Manager to be used with AWX's ALB"
+  type        = string
 }

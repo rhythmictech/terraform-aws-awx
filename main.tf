@@ -53,12 +53,28 @@ resource "aws_lb_target_group" "awx" {
 
 resource "aws_lb_listener" "awx" {
   load_balancer_arn = module.ecs-cluster.alb-arn
-  port              = 80
-  protocol          = "HTTP"
+  port              = 443
+  protocol          = "HTTPS"
 
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.awx.arn
+  }
+}
+
+resource "aws_lb_listener" "https_redirect" {
+  load_balancer_arn = module.ecs-cluster.alb-arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type = "redirect"
+
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
   }
 }
 
@@ -83,10 +99,7 @@ module "ecs-cluster" {
 # ECS - IAM/Secrets
 # =============================================
 
-resource "tls_private_key" "ecs_root" {
-  algorithm = "RSA"
-  rsa_bits  = 4096
-}
+# ECS Role 
 
 resource "aws_iam_role" "ecs-service-role" {
   name = "awx-ecs"
@@ -122,23 +135,6 @@ resource "aws_iam_role_policy_attachment" "ecs-service-role-route53-read-only" {
   role = "${aws_iam_role.ecs-service-role.name}"
 }
 
-# resource "aws_secretsmanager_secret" "ecs_root_ssh_key" {
-#   name_prefix = "awx-ecs-ssh-key-${var.env}-"
-#   description = "ssh key for ec2-user user on ECS Instances"
-
-#   tags = merge(
-#     var.tags,
-#     {
-#       "Name" = "awx-ecs-root-ssh-key"
-#     },
-#   )
-# }
-
-# resource "aws_secretsmanager_secret_version" "ecs-root-ssh-key-value" {
-#   secret_id     = aws_secretsmanager_secret.ecs_root_ssh_key.id
-#   secret_string = tls_private_key.ecs_root.private_key_pem
-# }
-
 data "aws_iam_policy_document" "ecs-instance-policy-document" {
   statement {
     actions = [
@@ -149,6 +145,37 @@ data "aws_iam_policy_document" "ecs-instance-policy-document" {
       "arn:aws:rds-db:${local.region}:${local.account_id}:dbuser:${module.database.this_rds_cluster_id}/${module.database.this_rds_cluster_master_username}",
     ]
   }
+}
+
+# ECS EC2 Instances Key
+
+resource "tls_private_key" "ecs_root" {
+  algorithm = "RSA"
+  rsa_bits = 4096
+}
+
+resource "aws_secretsmanager_secret" "ecs_root_ssh_key" {
+  name_prefix = "awx-ecs-ssh-key-${var.env}-"
+  description = "ssh key for ec2-user user on ECS Instances"
+
+  tags = merge(
+    var.tags,
+    {
+      "Name" = "awx-ecs-root-ssh-key"
+    },
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "ecs-root-ssh-key-value" {
+  secret_id = aws_secretsmanager_secret.ecs_root_ssh_key.id
+  secret_string = tls_private_key.ecs_root.private_key_pem
+}
+
+# ECS ALB SSL Cert
+
+resource "aws_lb_listener_certificate" "awx" {
+  listener_arn = aws_lb_listener.awx.arn
+  certificate_arn = var.alb_ssl_certificate_arn
 }
 
 # =============================================
@@ -240,11 +267,11 @@ resource "aws_security_group_rule" "ecs_ec2_egress" {
 }
 
 resource "aws_security_group_rule" "rds_ingress" {
-  type            = "ingress"
-  description     = "Allow ECS RDS Communication"
-  from_port       = 5432
-  to_port         = 5432
-  protocol        = "tcp"
+  type = "ingress"
+  description = "Allow ECS RDS Communication"
+  from_port = 5432
+  to_port = 5432
+  protocol = "tcp"
   security_group_id = module.database.this_security_group_id
   source_security_group_id = module.ecs-cluster.ec2-sg-id
 }

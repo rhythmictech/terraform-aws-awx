@@ -1,3 +1,7 @@
+# =============================================
+# General
+# =============================================
+
 data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
 
@@ -16,6 +20,14 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "env" {
+  description = "environment to tag resources with"
+  type        = string
+  default     = "default"
+}
+
+# Networking
 
 variable "vpc_id" {
   description = "VPC ID where resources will be created"
@@ -42,14 +54,52 @@ variable "cidr_block" {
   type        = string
 }
 
+# DB 
+
 variable "db_instance_type" {
   description = "Instance type used by the Aurora Postgres database"
   type        = "string"
   default     = "db.t3.medium"
 }
 
-variable "env" {
-  description = "environment to tag resources with"
+variable "db_username" {
+  description = "Username of DB user which AWX will use"
+  default     = "awx"
+}
+
+variable "db_password" {
+  description = "Password for AWX DB user"
+  default     = "password"
+}
+
+# =============================================
+# AWX Specific
+# =============================================
+
+variable "cluster_name" {
+  type    = string
+  default = "awx"
+}
+
+variable "ecs_instance_type" {
+  description = "Instance type (size) for the EC2 instances which comprise the ECS cluster"
   type        = string
-  default     = "default"
+  default     = "t3.medium"
+}
+
+variable "ecs_min_instances" {
+  default = 2
+}
+
+variable "ecs_max_instances" {
+  default = 6
+}
+
+variable "ecs_desired_instances" {
+  default = 2
+}
+
+variable "alb_ssl_certificate_arn" {
+  description = "ARN for an SSL certificate stored in Certificate Manager to be used with AWX's ALB"
+  type        = string
 }

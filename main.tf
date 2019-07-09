@@ -40,8 +40,6 @@ resource "aws_ecs_service" "awx" {
     container_name   = "awxweb"
     container_port   = 8052
   }
-
-  # tags = local.common_tags
 }
 
 module "ecs-cluster" {
@@ -58,9 +56,7 @@ module "ecs-cluster" {
   max_instances            = var.ecs_max_instances
   desired_instances        = var.ecs_desired_instances
 
-  tags = merge({
-    # service = aws_ecs_service.awx.arn
-  }, local.common_tags)
+  tags = local.common_tags
 }
 
 # ALB
@@ -321,11 +317,7 @@ module "database" {
   db_parameter_group_name = "default.aurora-postgresql10"
   db_cluster_parameter_group_name = "default.aurora-postgresql10"
 
-  # enabled_cloudwatch_logs_exports = []
-
-  tags = merge({
-    # cluster_parameter_group = aws_rds_cluster_parameter_group.default.arn
-  }, local.common_tags)
+  tags = local.common_tags
 }
 
 

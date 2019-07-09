@@ -6,7 +6,7 @@ resource "aws_ecs_task_definition" "awx" {
   # the ecs module appends "-cluster" to the name
   family             = "${var.cluster_name}-cluster"
   execution_role_arn = aws_iam_role.execution_role.arn
-  container_definitions = templatefile("${path.module}/service/service.json", {
+  container_definitions = templatefile("${path.module}/service.json", {
     awx_secret_key_arn     = module.awx_secret_key.secret.arn
     awx_admin_username     = var.awx_admin_username
     awx_admin_password_arn = module.awx_admin_password.secret.arn

@@ -5,7 +5,7 @@ provider "aws" {
 module "awx" {
   source = "../"
 
-  cluster_name            = "awx-ssl"
+  cluster_name            = "awx-ssl-2"
   db_instance_type        = var.db_instance_type
   vpc_id                  = var.vpc_id
   cidr_block              = var.cidr_block
@@ -15,6 +15,7 @@ module "awx" {
   alb_ssl_certificate_arn = var.alb_ssl_certificate_arn
   ecs_instance_type       = var.ecs_instance_type
   tags                    = var.tags
+  route53_zone_name      = var.route53_zone_name
 }
 
 output "alb_dns_name" {

@@ -103,3 +103,5 @@ variable "alb_ssl_certificate_arn" {
   description = "ARN for an SSL certificate stored in Certificate Manager to be used with AWX's ALB"
   type        = string
 }
+
+variable "route53_zone_name" {}

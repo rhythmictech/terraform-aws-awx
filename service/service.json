@@ -1,7 +1,7 @@
 [
     {
         "name": "awxweb",
-        "image": "sblack4/awx_web:latest",
+        "image": "sblack4/awx_web:v6-b3",
         "hostname": "awxweb",
         "links": [
             "awx:awx",
@@ -28,7 +28,27 @@
             },
             {
                 "name": "AWX_ADMIN_USER",
-                "valueFrom": "${ awx_admin_username }"
+                "value": "${ awx_admin_username }"
+            },
+            {
+                "name": "DATABASE_PORT",
+                "value": "5432"
+            },
+            {
+                "name": "MEMCACHED_HOST",
+                "value": "memcached"
+            },
+            {
+                "name": "MEMCACHED_PORT",
+                "value": "11211"
+            },
+            {
+                "name": "RABBITMQ_HOST",
+                "value": "rabbitmq"
+            },
+            {
+                "name": "RABBITMQ_PORT",
+                "value": "5672"
             }
         ],
         "secrets": [
@@ -38,17 +58,17 @@
             },
             {
                 "name": "SECRET_KEY",
-                "valueFrom": "${ awx_secret_key }"
+                "valueFrom": "${ awx_secret_key_arn }"
             }, 
             {
                 "name": "AWX_ADMIN_PASSWORD",
-                "valueFrom": "${ awx_admin_password }"
+                "valueFrom": "${ awx_admin_password_arn }"
             }
         ]
     },
     {
         "name": "awx",
-        "image": "sblack4/awx_task:latest",
+        "image": "sblack4/awx_task:v6-b3",
         "hostname": "awx",
         "links": [
             "rabbitmq:rabbitmq",
@@ -74,7 +94,27 @@
             },
             {
                 "name": "AWX_ADMIN_USER",
-                "valueFrom": "${ awx_admin_username }"
+                "value": "${ awx_admin_username }"
+            },
+            {
+                "name": "DATABASE_PORT",
+                "value": "5432"
+            },
+            {
+                "name": "MEMCACHED_HOST",
+                "value": "memcached"
+            },
+            {
+                "name": "MEMCACHED_PORT",
+                "value": "11211"
+            },
+            {
+                "name": "RABBITMQ_HOST",
+                "value": "rabbitmq"
+            },
+            {
+                "name": "RABBITMQ_PORT",
+                "value": "5672"
             }
         ],
         "secrets": [
@@ -84,11 +124,11 @@
             },
             {
                 "name": "SECRET_KEY",
-                "valueFrom": "${ awx_secret_key }"
+                "valueFrom": "${ awx_secret_key_arn }"
             }, 
             {
                 "name": "AWX_ADMIN_PASSWORD",
-                "valueFrom": "${ awx_admin_password }"
+                "valueFrom": "${ awx_admin_password_arn }"
             }
         ]
     },

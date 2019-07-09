@@ -28,6 +28,12 @@ variable "env" {
   default     = "default"
 }
 
+variable "route53_zone_name" {
+  description = "Zone name for Route53 zone to add URL to"
+  type        = string
+}
+
+
 # Networking
 
 variable "vpc_id" {
@@ -97,7 +103,7 @@ variable "awx_admin_username" {
 }
 
 variable "awx_admin_password" {
-  default = "awspassword"
+  default = "awxpassword"
 }
 
 # ECS 

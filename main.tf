@@ -2,24 +2,19 @@
 # ECS - Task/Service/EC2/ALB
 # =============================================
 
-data "template_file" "ecs_container_definitions" {
-  template = "${path.module}/service/service.json"
-
-  vars = {
-    awx_secret_key     = var.awx_secret_key
-    awx_admin_username = var.awx_admin_username
-    awx_admin_password = var.awx_admin_password
-
-    database_username     = var.db_username
-    database_password_arn = module.db_password_secret.secret.arn
-    database_host         = module.database.this_rds_cluster_endpoint
-  }
-}
-
 resource "aws_ecs_task_definition" "awx" {
   # the ecs module appends "-cluster" to the name
-  family                = "${var.cluster_name}-cluster"
-  container_definitions = data.template_file.ecs_container_definitions.rendered
+  family             = "${var.cluster_name}-cluster"
+  execution_role_arn = aws_iam_role.execution_role.arn
+  container_definitions = templatefile("${path.module}/service/service.json", {
+    awx_secret_key_arn     = module.awx_secret_key.secret.arn
+    awx_admin_username     = var.awx_admin_username
+    awx_admin_password_arn = module.awx_admin_password.secret.arn
+
+    database_username     = var.db_username
+    database_password_arn = module.db_password.secret.arn
+    database_host         = module.database.this_rds_cluster_endpoint
+  })
 
   volume {
     name = "secrets"
@@ -46,7 +41,7 @@ resource "aws_ecs_service" "awx" {
     container_port   = 8052
   }
 
-  tags = local.common_tags
+  # tags = local.common_tags
 }
 
 module "ecs-cluster" {
@@ -63,7 +58,9 @@ module "ecs-cluster" {
   max_instances            = var.ecs_max_instances
   desired_instances        = var.ecs_desired_instances
 
-  tags = local.common_tags
+  tags = merge({
+    # service = aws_ecs_service.awx.arn
+  }, local.common_tags)
 }
 
 # ALB
@@ -118,11 +115,77 @@ resource "aws_lb_listener" "https_redirect" {
   }
 }
 
+# Route 53
+
+data "aws_route53_zone" "zone" {
+  name = var.route53_zone_name
+}
+
+resource "aws_route53_record" "url" {
+  zone_id = data.aws_route53_zone.zone.zone_id
+  type    = "A"
+  name    = "${var.cluster_name}.${data.aws_route53_zone.zone.name}"
+
+  alias {
+    name                   = module.ecs-cluster.alb-dns
+    zone_id                = module.ecs-cluster.alb-zone
+    evaluate_target_health = false
+  }
+}
+
 # =============================================
 # ECS - IAM/Secrets
 # =============================================
 
-# ECS Role 
+# ECS Task Role 
+
+resource "aws_iam_role" "execution_role" {
+  name               = "${var.cluster_name}-execution-role"
+  path               = "/"
+  assume_role_policy = data.aws_iam_policy_document.execution_assume_role_policy_document.json
+}
+
+data "aws_iam_policy_document" "execution_assume_role_policy_document" {
+  statement {
+    actions = [
+      "sts:AssumeRole",
+    ]
+
+    principals {
+      type        = "Service"
+      identifiers = ["ecs-tasks.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "execution_role_attachment" {
+  role       = aws_iam_role.execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+data "aws_iam_policy_document" "execution_role_secrets_policy" {
+  statement {
+    actions = [
+      "ssm:GetParameters",
+      "secretsmanager:GetSecretValue",
+      "kms:Decrypt"
+    ]
+
+    resources = [
+      module.db_password.secret.arn,
+      module.awx_admin_password.secret.arn,
+      module.awx_secret_key.secret.arn
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "execution_role_secrets_policy" {
+  name   = "${var.cluster_name}-execution-role-secrets-policy"
+  role   = aws_iam_role.execution_role.id
+  policy = data.aws_iam_policy_document.execution_role_secrets_policy.json
+}
+
+# ECS Service Role 
 
 resource "aws_iam_role" "ecs-service-role" {
   name = "${var.cluster_name}-ecs-service-role"
@@ -203,8 +266,8 @@ resource "aws_lb_listener_certificate" "awx" {
 
 # AWX Component Secrets 
 
-module "db_password_secret" {
-  source = "github.com/rhythmictech/terraform-aws-secretsmanager-secret?ref=v0.0.2"
+module "db_password" {
+  source = "github.com/rhythmictech/terraform-aws-secretsmanager-secret?ref=v0.0.3"
 
   name = "${var.cluster_name}-db-password"
   description = "RDS password for AWX ECS cluster ${var.cluster_name}"
@@ -212,15 +275,27 @@ module "db_password_secret" {
   tags = local.common_tags
 }
 
+module "awx_secret_key" {
+  source = "github.com/rhythmictech/terraform-aws-secretsmanager-secret?ref=v0.0.3"
+
+  name = "${var.cluster_name}-awx-secret"
+  description = "AWX secret for ${var.cluster_name}"
+  value = var.awx_secret_key
+  tags = local.common_tags
+}
+
+module "awx_admin_password" {
+  source = "github.com/rhythmictech/terraform-aws-secretsmanager-secret?ref=v0.0.3"
+
+  name = "${var.cluster_name}-awx-password"
+  description = "AWX password for ${var.cluster_name}"
+  value = var.awx_admin_password
+  tags = local.common_tags
+}
+
 # =============================================
 #  RDS
 # =============================================
-
-resource "aws_rds_cluster_parameter_group" "default" {
-  name = "${var.cluster_name}-default"
-  family = "aurora-postgresql10"
-  description = "RDS default cluster parameter group"
-}
 
 module "database" {
   source = "terraform-aws-modules/rds-aurora/aws"
@@ -229,6 +304,7 @@ module "database" {
   name = "${var.cluster_name}-postgres"
   username = var.db_username
   password = var.db_password
+  database_name = "awx"
 
   engine = "aurora-postgresql"
   engine_version = "10.7"
@@ -242,12 +318,14 @@ module "database" {
   storage_encrypted = true
   apply_immediately = true
 
-  db_parameter_group_name = "${var.cluster_name}-default.aurora-postgresql10"
-  db_cluster_parameter_group_name = "${var.cluster_name}-default.aurora-postgresql10"
+  db_parameter_group_name = "default.aurora-postgresql10"
+  db_cluster_parameter_group_name = "default.aurora-postgresql10"
 
   # enabled_cloudwatch_logs_exports = []
 
-  tags = local.common_tags
+  tags = merge({
+    # cluster_parameter_group = aws_rds_cluster_parameter_group.default.arn
+  }, local.common_tags)
 }
 
 

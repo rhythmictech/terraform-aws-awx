@@ -77,8 +77,13 @@ resource "aws_iam_role" "ecs-service-role" {
 POLICY
 }
 
-resource "aws_iam_role_policy_attachment" "ecs-service-role-attachment" {
+resource "aws_iam_role_policy_attachment" "ecs-container-service-role-attachment" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole"
+  role = aws_iam_role.ecs-service-role.name
+}
+
+resource "aws_iam_role_policy_attachment" "ecs-elb-read-role-attachment" {
+  policy_arn = "arn:aws:iam::aws:policy/ElasticLoadBalancingReadOnly"
   role = aws_iam_role.ecs-service-role.name
 }
 
@@ -118,7 +123,7 @@ resource "aws_secretsmanager_secret" "ecs_root_ssh_key" {
   tags = merge(
     local.common_tags,
     {
-      "Name" = "awx-ecs-root-ssh-key"
+      Name = "awx-ecs-root-ssh-key"
     },
   )
 }

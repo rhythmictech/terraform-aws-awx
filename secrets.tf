@@ -8,6 +8,9 @@ resource "aws_iam_role" "execution_role" {
   name               = "${var.cluster_name}-execution-role"
   path               = "/"
   assume_role_policy = data.aws_iam_policy_document.execution_assume_role_policy_document.json
+
+  # necessary to ensure deletion 
+  force_detach_policies = true
 }
 
 data "aws_iam_policy_document" "execution_assume_role_policy_document" {
@@ -54,6 +57,9 @@ resource "aws_iam_role_policy" "execution_role_secrets_policy" {
 
 resource "aws_iam_role" "ecs-service-role" {
   name = "${var.cluster_name}-ecs-service-role"
+
+  # necessary to ensure deletion 
+  force_detach_policies = true
 
   assume_role_policy = <<POLICY
 {

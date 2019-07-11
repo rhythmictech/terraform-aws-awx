@@ -37,3 +37,7 @@ output "ecs_iam_role" {
 # }
 
 # TODO: add security groups 
+
+output "dns_address" {
+  value = aws_route53_record.url.fqdn
+}

@@ -26,3 +26,6 @@ output "ecs_private_key" {
   value = module.awx.ecs_private_key.private_key_pem
 }
 
+output "dns_address" {
+  value = module.awx.dns_address
+}

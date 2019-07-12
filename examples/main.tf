@@ -18,14 +18,18 @@ module "awx" {
   route53_zone_name      = var.route53_zone_name
 }
 
-output "alb_dns_name" {
-  value = module.awx.alb_dns_name
-}
+# output "alb_dns_name" {
+#   value = module.awx.alb_dns_name
+# }
 
-output "ecs_private_key" {
-  value = module.awx.ecs_private_key.private_key_pem
-}
+# output "ecs_private_key" {
+#   value = module.awx.ecs_private_key.private_key_pem
+# }
 
-output "dns_address" {
-  value = module.awx.dns_address
+# output "dns_address" {
+#   value = module.awx.dns_address
+# }
+
+output "eks" {
+  value = module.awx.eks.kubeconfig
 }

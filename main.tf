@@ -93,8 +93,8 @@ module "database" {
 # =============================================
 
 module "eks" {
-  source          = "terraform-aws-modules/eks/aws"
-  version         = "~> 5.0.0"
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 5.0.0"
 
   cluster_name    = var.cluster_name
   subnets         = var.public_subnets
@@ -129,95 +129,330 @@ output "eks" {
 
 locals {
   kube_config_path = "${path.root}/${module.eks.kubeconfig_filename}"
-  tiller_sa_file   = "${path.module}/templates/tiller-service-account.yaml"
-}
-
-data "aws_eks_cluster_auth" "awx" {
-  name = module.eks.cluster_id
 }
 
 # =============================================
-# K8s - tiller
+# K8s
 # =============================================
 
 provider "kubernetes" {
-  version = "~> 1.8.0"
+  version     = "~> 1.8.0"
   config_path = local.kube_config_path
 }
 
+# =============================================
+# K8s Secrets 
+# =============================================
 
-resource "kubernetes_service_account" "tiller" {
+resource "kubernetes_secret" "dbpassword" {
   metadata {
-    name      = "tiller"
-    namespace = "kube-system"
+    name = "dbpassword"
   }
 
-  automount_service_account_token = true
-}
-
-resource "kubernetes_cluster_role_binding" "tiller" {
-  metadata {
-    name = "tiller"
-  }
-
-  role_ref {
-    kind      = "ClusterRole"
-    name      = "cluster-admin"
-    api_group = "rbac.authorization.k8s.io"
-  }
-
-  subject {
-    kind = "ServiceAccount"
-    name = "tiller"
-
-    api_group = ""
-    namespace = "kube-system"
+  data = {
+    password = module.database.this_rds_cluster_master_password
   }
 }
 
 # =============================================
-# Helm
+# K8s Services & Deployments 
 # =============================================
 
-provider "helm" {
-  version = "~> 0.10.0"
+locals {
+  nginx_name     = "${var.cluster_name}-nginx"
+  rabbitmq_name  = "${var.cluster_name}-rabbitmq"
+  memcached_name = "${var.cluster_name}-memcached"
+  awx_web_name   = "${var.cluster_name}-awx-web"
+  awx_task_name  = "${var.cluster_name}-awx-task"
 
-  debug = true
-  install_tiller = true
-  service_account = kubernetes_service_account.tiller.metadata.0.name
-  namespace = kubernetes_service_account.tiller.metadata.0.namespace
-  # ca_certificate = module.eks.cluster_certificate_authority_data
-  insecure = true
-  kubernetes {
-    # config_path = local.kube_config_path
-    # load_config_file = true
-    host = module.eks.cluster_endpoint
-    cluster_ca_certificate = module.eks.cluster_certificate_authority_data
-    token = data.aws_eks_cluster_auth.awx.token
+  common_labels = {
+    app = var.cluster_name
+  }
+
+  nginx_labels = merge(local.common_labels, {
+    component = "nginx"
+    name      = local.nginx_name
+  })
+
+  rabbitmq_labels = merge(local.common_labels, {
+    component = "rabbitmq"
+    name      = local.rabbitmq_name
+  })
+  rabbitmq_env = {
+    RABBITMQ_DEFAULT_VHOST = "awx"
+    RABBITMQ_DEFAULT_USER  = "guest"
+    RABBITMQ_DEFAULT_PASS  = "awxpass"
+    RABBITMQ_ERLANG_COOKIE = "cockiemonster"
+  }
+
+  memcached_labels = merge(local.common_labels, {
+    component = "memcached"
+    name      = local.memcached_name
+  })
+  
+  awx_web_labels = merge(local.common_labels, {
+    component = "awx-web"
+    name      = local.awx_web_name
+  })
+  
+  awx_task_labels = merge(local.common_labels, {
+    component = "awx-task"
+    name      = local.awx_task_name
+  })
+
+  awx_env = merge(local.rabbitmq_env, {
+    DATABASE_HOST = module.database.this_rds_cluster_endpoint
+    DATABASE_USER = var.db_username
+    DATABASE_PASSWORD = var.db_password
+    DATABASE_NAME = "awx"
+    RABBITMQ_HOST = "awx-rabbitmq"
+    MEMCACHED_HOST = "awx-memcached"
+    SECRET_KEY = "awxsecret"
+    AWX_ADMIN_USER="admin"
+    AWX_ADMIN_PASSWORD="awxpassword"
+  })
+}
+
+# RDS External Name 
+resource "kubernetes_service" "rds_external_service" {
+  metadata {
+    name = "rds-external-service"
+    labels = merge(local.common_labels, {
+      component = "db"
+      name      = "${var.cluster_name}-postgres"
+    })
+  }
+  spec {
+    type          = "ExternalName"
+    external_name = module.database.this_rds_cluster_endpoint
   }
 }
 
-data "helm_repository" "rhythmic" {
-  name = "rhythmic"
-  url  = "https://rhythmictech.github.io/helm-charts/"
+
+# nginx
+resource "kubernetes_ingress" "nginx" {
+  metadata {
+    name = local.nginx_name
+  }
+  spec {
+    rule {
+      # host = replace(module.eks.cluster_endpoint, "https://", "")
+      http {
+        path {
+          path = "/"
+          backend {
+            service_name = local.awx_web_name
+            service_port = 80
+          }
+        }
+      }
+    }
+  }
 }
 
-resource "helm_release" "nginx" {
-  name = "nginx"
-  chart = "stable/nginx"
+resource "kubernetes_service" "nginx" {
+  metadata {
+    name   = local.nginx_name
+    labels = local.nginx_labels
+  }
+  spec {
+    selector = local.nginx_labels
+    port {
+      port        = 8080
+      target_port = 80
+    }
+  }
 }
 
+resource "kubernetes_deployment" "nginx" {
+  metadata {
+    name   = local.nginx_name
+    labels = local.nginx_labels
+  }
+  spec {
+    replicas = 1
+    selector {
+      match_labels = local.nginx_labels
+    }
+    template {
+      metadata {
+        labels = local.nginx_labels
+      }
+      spec {
+        container {
+          image = "nginx:1.7.8"
+          name  = local.nginx_name
+        }
+      }
+    }
+  }
+}
 
-# resource "helm_release" "awx" {
-#   name = "awx"
-#   repository = data.helm_repository.stable.metadata.0.name
-#   chart = "awx"
-#   version = "0.0.4"
+# rabbitmq
+resource "kubernetes_service" "rabbitmq" {
+  metadata {
+    name = "${var.cluster_name}-rabbitmq"
+    labels = {
+      app       = var.cluster_name
+      component = "rabbitmq"
+    }
+  }
+  spec {
+    selector = {
+      app       = var.cluster_name
+      component = "rabbitmq"
+    }
+    port {
+      port = 5672
+    }
+  }
+}
+resource "kubernetes_deployment" "rabbitmq" {
+  metadata {
+    name   = local.rabbitmq_name
+    labels = local.rabbitmq_labels
+  }
+  spec {
+    replicas = 1
+    selector {
+      match_labels = local.rabbitmq_labels
+    }
+    template {
+      metadata {
+        labels = local.rabbitmq_labels
+      }
+      spec {
+        container {
+          image = "rabbitmq:3"
+          name  = local.rabbitmq_name
 
-#   set {
-#     name = "ingress.hosts"
-#     value = [
+          dynamic "env" {
+            for_each = local.rabbitmq_env
+            content {
+              name  = env.key
+              value = env.value
+            }
+          }
+        }
+      }
+    }
+  }
+}
 
-#     ]
-#   }
-# }
+# cache (memcached)
+resource "kubernetes_service" "memcached" {
+  metadata {
+    name   = local.memcached_name
+    labels = local.memcached_labels
+  }
+  spec {
+    selector = local.memcached_labels
+    port {
+      port = 11211
+    }
+  }
+}
+resource "kubernetes_deployment" "memcached" {
+  metadata {
+    name   = local.memcached_name
+    labels = local.memcached_labels
+  }
+  spec {
+    replicas = 1
+    selector {
+      match_labels = local.memcached_labels
+    }
+    template {
+      metadata {
+        labels = local.memcached_labels
+      }
+      spec {
+        container {
+          image = "memcached:alpine"
+          name  = local.memcached_name
+        }
+      }
+    }
+  }
+}
+
+# awx_task 
+resource "kubernetes_deployment" "awx_task" {
+  metadata {
+    name = local.awx_task_name
+    labels = local.awx_task_labels
+  }
+  spec {
+    selector {
+      match_labels = local.awx_task_labels
+    }
+    template {
+      metadata {
+        labels = local.awx_task_labels
+      }
+      spec {
+        container {
+          image = "sblack4/awx_task:v6-b3"
+          name = local.awx_task_name
+          dynamic "env" {
+            for_each = local.awx_env
+            content {
+              name  = env.key
+              value = env.value
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+# awx web 
+resource "kubernetes_service" "awx_web" {
+  metadata {
+    name   = local.awx_web_name
+    labels = local.awx_web_labels
+  }
+  spec {
+    selector = local.awx_web_labels
+    type     = "NodePort"
+    port {
+      name = local.awx_web_name
+      port = 80
+      target_port = 8052
+    }
+  }
+}
+resource "kubernetes_deployment" "awx_web" {
+  metadata {
+    name = local.awx_web_name
+    labels = local.awx_web_labels
+  }
+  spec {
+    selector {
+      match_labels = local.awx_web_labels
+    }
+    template {
+      metadata {
+        labels = local.awx_web_labels
+      }
+      spec {
+        container {
+          image = "sblack4/awx_web:v6-b3"
+          name = local.awx_web_name
+          port {
+            name = local.awx_web_name
+            container_port = 8052
+          }
+          dynamic "env" {
+            for_each = local.awx_env
+            content {
+              name  = env.key
+              value = env.value
+            }
+          }
+        }
+      }
+    }
+  }
+}

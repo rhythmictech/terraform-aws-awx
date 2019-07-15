@@ -81,27 +81,24 @@ variable "cluster_name" {
   default = "awx"
 }
 
-variable "ecs_instance_type" {
-  description = "Instance type (size) for the EC2 instances which comprise the ECS cluster"
-  type        = string
-  default     = "t3.medium"
-}
-
-variable "ecs_min_instances" {
-  default = 2
-}
-
-variable "ecs_max_instances" {
-  default = 6
-}
-
-variable "ecs_desired_instances" {
-  default = 2
-}
-
 variable "alb_ssl_certificate_arn" {
   description = "ARN for an SSL certificate stored in Certificate Manager to be used with AWX's ALB"
   type        = string
+}
+
+variable "awx_secret_key" {
+  type    = string
+  default = "awxsecret"
+}
+
+variable "awx_admin_username" {
+  type    = string
+  default = "admin"
+}
+
+variable "awx_admin_password" {
+  type    = string
+  default = "awxpassword"
 }
 
 variable "route53_zone_name" {}

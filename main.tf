@@ -56,6 +56,39 @@ resource "aws_security_group" "all_worker_mgmt" {
 }
 
 # =============================================
+# Secrets
+# =============================================
+
+# AWX Component Secrets 
+
+module "db_password" {
+  source = "github.com/rhythmictech/terraform-aws-secretsmanager-secret?ref=v0.0.3"
+
+  name        = "${var.cluster_name}-db-password"
+  description = "RDS password for AWX ECS cluster ${var.cluster_name}"
+  value       = module.database.this_rds_cluster_master_password
+  tags        = local.common_tags
+}
+
+module "awx_secret_key" {
+  source = "github.com/rhythmictech/terraform-aws-secretsmanager-secret?ref=v0.0.3"
+
+  name        = "${var.cluster_name}-awx-secret"
+  description = "AWX secret for ${var.cluster_name}"
+  value       = var.awx_secret_key
+  tags        = local.common_tags
+}
+
+module "awx_admin_password" {
+  source = "github.com/rhythmictech/terraform-aws-secretsmanager-secret?ref=v0.0.3"
+
+  name        = "${var.cluster_name}-awx-password"
+  description = "AWX password for ${var.cluster_name}"
+  value       = var.awx_admin_password
+  tags        = local.common_tags
+}
+
+# =============================================
 # RDS
 # =============================================
 
@@ -108,6 +141,7 @@ module "eks" {
       additional_userdata           = "echo foo bar"
       asg_desired_capacity          = 3
       additional_security_group_ids = [aws_security_group.worker_group_mgmt_one.id]
+      # TODO: figure out why this doesn't work
       # tags = merge(local.common_tags, {
       #   propagate_at_launch = true
       # })
@@ -148,9 +182,26 @@ resource "kubernetes_secret" "dbpassword" {
   metadata {
     name = "dbpassword"
   }
-
   data = {
-    password = module.database.this_rds_cluster_master_password
+    password = var.db_password
+  }
+}
+
+resource "kubernetes_secret" "awx_password" {
+  metadata {
+    name = "awx-password"
+  }
+  data = {
+    password = var.awx_admin_password
+  }
+}
+
+resource "kubernetes_secret" "awx_secret" {
+  metadata {
+    name = "awx-secret"
+  }
+  data = {
+    password = var.awx_secret_key
   }
 }
 
@@ -189,12 +240,12 @@ locals {
     component = "memcached"
     name      = local.memcached_name
   })
-  
+
   awx_web_labels = merge(local.common_labels, {
     component = "awx-web"
     name      = local.awx_web_name
   })
-  
+
   awx_task_labels = merge(local.common_labels, {
     component = "awx-task"
     name      = local.awx_task_name
@@ -203,13 +254,13 @@ locals {
   awx_env = merge(local.rabbitmq_env, {
     DATABASE_HOST = module.database.this_rds_cluster_endpoint
     DATABASE_USER = var.db_username
-    DATABASE_PASSWORD = var.db_password
-    DATABASE_NAME = "awx"
-    RABBITMQ_HOST = "awx-rabbitmq"
-    MEMCACHED_HOST = "awx-memcached"
-    SECRET_KEY = "awxsecret"
-    AWX_ADMIN_USER="admin"
-    AWX_ADMIN_PASSWORD="awxpassword"
+    # DATABASE_PASSWORD = var.db_password
+    DATABASE_NAME      = "awx"
+    RABBITMQ_HOST      = "awx-rabbitmq"
+    MEMCACHED_HOST     = "awx-memcached"
+    SECRET_KEY         = "awxsecret"
+    AWX_ADMIN_USER     = "admin"
+    AWX_ADMIN_PASSWORD = "awxpassword"
   })
 }
 
@@ -221,6 +272,9 @@ resource "kubernetes_service" "rds_external_service" {
       component = "db"
       name      = "${var.cluster_name}-postgres"
     })
+    annotations = {
+      "kubernetes.io/ingress.class" = "nginx"
+    }
   }
   spec {
     type          = "ExternalName"
@@ -379,7 +433,7 @@ resource "kubernetes_deployment" "memcached" {
 # awx_task 
 resource "kubernetes_deployment" "awx_task" {
   metadata {
-    name = local.awx_task_name
+    name   = local.awx_task_name
     labels = local.awx_task_labels
   }
   spec {
@@ -393,7 +447,7 @@ resource "kubernetes_deployment" "awx_task" {
       spec {
         container {
           image = "sblack4/awx_task:v6-b3"
-          name = local.awx_task_name
+          name  = local.awx_task_name
           dynamic "env" {
             for_each = local.awx_env
             content {
@@ -401,6 +455,40 @@ resource "kubernetes_deployment" "awx_task" {
               value = env.value
             }
           }
+          env {
+            name = "DATABASE_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.dbpassword.metadata.0.name
+                key = "password"
+              }
+            }
+          }
+          env {
+            name = "AWX_ADMIN_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.awx_password.metadata.0.name
+                key = "password"
+              }
+            }
+          }
+          env {
+            name = "SECRET_KEY"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.awx_secret.metadata.0.name
+                key = "password"
+              }
+            }
+          }
+          # env_from = [{
+          #   name = kubernetes_secret.dbpassword.metadata.0.name
+          # },{
+          #   name = kubernetes_secret.awx_password.metadata.0.name
+          # },{
+          #   name = kubernetes_secret.awx_secret.metadata.0.name
+          # }]
         }
       }
     }
@@ -417,15 +505,15 @@ resource "kubernetes_service" "awx_web" {
     selector = local.awx_web_labels
     type     = "NodePort"
     port {
-      name = local.awx_web_name
-      port = 80
+      name        = local.awx_web_name
+      port        = 80
       target_port = 8052
     }
   }
 }
 resource "kubernetes_deployment" "awx_web" {
   metadata {
-    name = local.awx_web_name
+    name   = local.awx_web_name
     labels = local.awx_web_labels
   }
   spec {
@@ -439,9 +527,9 @@ resource "kubernetes_deployment" "awx_web" {
       spec {
         container {
           image = "sblack4/awx_web:v6-b3"
-          name = local.awx_web_name
+          name  = local.awx_web_name
           port {
-            name = local.awx_web_name
+            name           = local.awx_web_name
             container_port = 8052
           }
           dynamic "env" {
@@ -451,6 +539,40 @@ resource "kubernetes_deployment" "awx_web" {
               value = env.value
             }
           }
+          env {
+            name = "DATABASE_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.dbpassword.metadata.0.name
+                key = "password"
+              }
+            }
+          }
+          env {
+            name = "AWX_ADMIN_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.awx_password.metadata.0.name
+                key = "password"
+              }
+            }
+          }
+          env {
+            name = "SECRET_KEY"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.awx_secret.metadata.0.name
+                key = "password"
+              }
+            }
+          }
+          # env_from = [{
+          #   name = kubernetes_secret.dbpassword.metadata.0.name
+          # },{
+          #   name = kubernetes_secret.awx_password.metadata.0.name
+          # },{
+          #   name = kubernetes_secret.awx_secret.metadata.0.name
+          # }]
         }
       }
     }

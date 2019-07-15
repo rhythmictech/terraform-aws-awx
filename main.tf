@@ -95,6 +95,7 @@ module "database" {
 module "eks" {
   source          = "terraform-aws-modules/eks/aws"
   version         = "~> 5.0.0"
+
   cluster_name    = var.cluster_name
   subnets         = var.public_subnets
   vpc_id          = var.vpc_id
@@ -127,57 +128,96 @@ output "eks" {
 # =============================================
 
 locals {
-  kube_config_path = "${module.eks.kubeconfig_filename}"
+  kube_config_path = "${path.root}/${module.eks.kubeconfig_filename}"
   tiller_sa_file   = "${path.module}/templates/tiller-service-account.yaml"
 }
 
+data "aws_eks_cluster_auth" "awx" {
+  name = module.eks.cluster_id
+}
 
-resource "null_resource" "install_helm" {
-  triggers = {
-    build_number = timestamp()
+# =============================================
+# K8s - tiller
+# =============================================
+
+provider "kubernetes" {
+  version = "~> 1.8.0"
+  config_path = local.kube_config_path
+}
+
+
+resource "kubernetes_service_account" "tiller" {
+  metadata {
+    name      = "tiller"
+    namespace = "kube-system"
   }
-  depends_on = [module.eks]
 
-  provisioner "local-exec" {
-    command = <<EOF
-    kubectl --kubeconfig ${local.kube_config_path} apply -f ${local.tiller_sa_file}
-    helm init --service-account tiller \
-      --kubeconfig ${local.kube_config_path} \
-    helm repo update
-EOF
+  automount_service_account_token = true
+}
+
+resource "kubernetes_cluster_role_binding" "tiller" {
+  metadata {
+    name = "tiller"
+  }
+
+  role_ref {
+    kind      = "ClusterRole"
+    name      = "cluster-admin"
+    api_group = "rbac.authorization.k8s.io"
+  }
+
+  subject {
+    kind = "ServiceAccount"
+    name = "tiller"
+
+    api_group = ""
+    namespace = "kube-system"
   }
 }
 
-resource "null_resource" "install_nginx" {
-  triggers = {
-    build_number = timestamp()
-  }
-  depends_on = [null_resource.install_helm]
+# =============================================
+# Helm
+# =============================================
 
-  provisioner "local-exec" {
-    command = <<EOF
-    helm install stable/nginx-ingress \
-      --kubeconfig ${local.kube_config_path} \
-      --name awx-ingress \
-      --set rbac.create=true
-EOF
+provider "helm" {
+  version = "~> 0.10.0"
+
+  debug = true
+  install_tiller = true
+  service_account = kubernetes_service_account.tiller.metadata.0.name
+  namespace = kubernetes_service_account.tiller.metadata.0.namespace
+  # ca_certificate = module.eks.cluster_certificate_authority_data
+  insecure = true
+  kubernetes {
+    # config_path = local.kube_config_path
+    # load_config_file = true
+    host = module.eks.cluster_endpoint
+    cluster_ca_certificate = module.eks.cluster_certificate_authority_data
+    token = data.aws_eks_cluster_auth.awx.token
   }
 }
 
-resource "null_resource" "install_awx" {
-  triggers = {
-    build_number = timestamp()
-  }
-  depends_on = [null_resource.install_nginx]
-
-  provisioner "local-exec" {
-    command = <<EOF
-    helm repo add rhythmictech https://rhythmictech.github.io/helm-charts/
-    helm repo update
-    helm install rhythmictech/awx \
-      --kubeconfig ${local.kube_config_path} \
-      --set ingress.hosts=["${module.eks.cluster_endpoint}"] \
-      --set dbHost="${module.database.this_rds_cluster_endpoint}"
-EOF
-  }
+data "helm_repository" "rhythmic" {
+  name = "rhythmic"
+  url  = "https://rhythmictech.github.io/helm-charts/"
 }
+
+resource "helm_release" "nginx" {
+  name = "nginx"
+  chart = "stable/nginx"
+}
+
+
+# resource "helm_release" "awx" {
+#   name = "awx"
+#   repository = data.helm_repository.stable.metadata.0.name
+#   chart = "awx"
+#   version = "0.0.4"
+
+#   set {
+#     name = "ingress.hosts"
+#     value = [
+
+#     ]
+#   }
+# }

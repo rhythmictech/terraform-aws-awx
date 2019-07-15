@@ -2,8 +2,7 @@ terraform {
   required_version = ">= 0.12.0"
 }
 
-data "aws_availability_zones" "available" {
-}
+data "aws_availability_zones" "available" {}
 
 # =============================================
 # Security Groups 
@@ -56,45 +55,50 @@ resource "aws_security_group" "all_worker_mgmt" {
   }
 }
 
-# # =============================================
-# # New VPC 
-# # =============================================
+# =============================================
+# RDS
+# =============================================
 
-# module "vpc" {
-#   source  = "terraform-aws-modules/vpc/aws"
-#   version = "2.6.0"
+module "database" {
+  source  = "terraform-aws-modules/rds-aurora/aws"
+  version = "~> 2.0"
 
-#   name               = "test-vpc"
-#   cidr               = "10.0.0.0/16"
-#   azs                = data.aws_availability_zones.available.names
-#   private_subnets    = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-#   public_subnets     = ["10.0.4.0/24", "10.0.5.0/24", "10.0.6.0/24"]
-#   enable_nat_gateway = true
-#   single_nat_gateway = true
+  name          = "${var.cluster_name}-postgres"
+  username      = var.db_username
+  password      = var.db_password
+  database_name = "awx"
 
-#   tags = merge({
-#     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-#   }, local.common_tags)
+  engine         = "aurora-postgresql"
+  engine_version = "10.7"
+  engine_mode    = "serverless"
 
-#   public_subnet_tags = merge({
-#     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-#   }, local.common_tags)
+  vpc_id  = var.vpc_id
+  subnets = var.database_subnets
 
-#   private_subnet_tags = merge({
-#     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-#     "kubernetes.io/role/internal-elb"             = "true"
-#   }, local.common_tags)
-# }
+  allowed_security_groups       = [module.eks.worker_security_group_id]
+  allowed_security_groups_count = 1
+  instance_type                 = var.db_instance_type
+  replica_count                 = 0
+  storage_encrypted             = true
+  apply_immediately             = true
+
+  db_parameter_group_name         = "default.aurora-postgresql10"
+  db_cluster_parameter_group_name = "default.aurora-postgresql10"
+
+  tags = local.common_tags
+}
 
 # =============================================
 # EKS Cluster
 # =============================================
 
 module "eks" {
-  source       = "terraform-aws-modules/eks/aws"
-  cluster_name = var.cluster_name
-  subnets      = var.public_subnets
-  vpc_id       = var.vpc_id
+  source          = "terraform-aws-modules/eks/aws"
+  version         = "~> 5.0.0"
+  cluster_name    = var.cluster_name
+  subnets         = var.public_subnets
+  vpc_id          = var.vpc_id
+  cluster_version = "1.13"
 
   worker_groups = [
     {
@@ -102,17 +106,14 @@ module "eks" {
       instance_type                 = "t3.small"
       additional_userdata           = "echo foo bar"
       asg_desired_capacity          = 3
-      additional_security_group_ids = [aws_security_group.worker_group_mgmt_one.id],
-      tags = merge(local.common_tags, {
-        propagate_at_launch = true
-      })
+      additional_security_group_ids = [aws_security_group.worker_group_mgmt_one.id]
+      # tags = merge(local.common_tags, {
+      #   propagate_at_launch = true
+      # })
     },
   ]
 
   worker_additional_security_group_ids = [aws_security_group.all_worker_mgmt.id]
-  # map_roles                            = var.map_roles
-  # map_users                            = var.map_users
-  # map_accounts                         = var.map_accounts
 
   tags = local.common_tags
 }
@@ -121,43 +122,62 @@ output "eks" {
   value = module.eks
 }
 
-
 # =============================================
-# Helm
+# Helm - AWX
 # =============================================
 
-provider "helm" {
-  kubernetes {
-    config_path = "${path.root}/${module.eks.kubeconfig_filename}"
+locals {
+  kube_config_path = "${module.eks.kubeconfig_filename}"
+  tiller_sa_file   = "${path.module}/templates/tiller-service-account.yaml"
+}
 
-    # host                   = module.eks.cluster_endpoint
-    # token                  = module.eks. "${data.google_client_config.current.access_token}"
-    # client_certificate     = "${base64decode(google_container_cluster.default.master_auth.0.client_certificate)}"
-    # client_key             = "${base64decode(google_container_cluster.default.master_auth.0.client_key)}"
-    # cluster_ca_certificate = module.eks.cluster_certificate_authority_data
+
+resource "null_resource" "install_helm" {
+  triggers = {
+    build_number = timestamp()
+  }
+  depends_on = [module.eks]
+
+  provisioner "local-exec" {
+    command = <<EOF
+    kubectl --kubeconfig ${local.kube_config_path} apply -f ${local.tiller_sa_file}
+    helm init --service-account tiller \
+      --kubeconfig ${local.kube_config_path} \
+    helm repo update
+EOF
   }
 }
 
-data "helm_repository" "rhythmic" {
-  name = "rhythmic"
-  url  = "https://rhythmictech.github.io/helm-charts/"
+resource "null_resource" "install_nginx" {
+  triggers = {
+    build_number = timestamp()
+  }
+  depends_on = [null_resource.install_helm]
+
+  provisioner "local-exec" {
+    command = <<EOF
+    helm install stable/nginx-ingress \
+      --kubeconfig ${local.kube_config_path} \
+      --name awx-ingress \
+      --set rbac.create=true
+EOF
+  }
 }
 
-# resource "helm_release" "nginx" {
+resource "null_resource" "install_awx" {
+  triggers = {
+    build_number = timestamp()
+  }
+  depends_on = [null_resource.install_nginx]
 
-# }
-
-
-# resource "helm_release" "awx" {
-#   name = "awx"
-#   repository = data.helm_repository.stable.metadata.0.name
-#   chart = "awx"
-#   version = "0.0.4"
-
-#   set {
-#     name = "ingress.hosts"
-#     value = [
-
-#     ]
-#   }
-# }
+  provisioner "local-exec" {
+    command = <<EOF
+    helm repo add rhythmictech https://rhythmictech.github.io/helm-charts/
+    helm repo update
+    helm install rhythmictech/awx \
+      --kubeconfig ${local.kube_config_path} \
+      --set ingress.hosts=["${module.eks.cluster_endpoint}"] \
+      --set dbHost="${module.database.this_rds_cluster_endpoint}"
+EOF
+  }
+}

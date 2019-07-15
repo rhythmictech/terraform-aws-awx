@@ -30,6 +30,11 @@ module "awx" {
 #   value = module.awx.dns_address
 # }
 
-output "eks" {
+output "eks_module" {
+  value = module.awx.eks
+}
+
+output "eks_kubeconfig" {
   value = module.awx.eks.kubeconfig
 }
+

@@ -254,13 +254,10 @@ locals {
   awx_env = merge(local.rabbitmq_env, {
     DATABASE_HOST = module.database.this_rds_cluster_endpoint
     DATABASE_USER = var.db_username
-    # DATABASE_PASSWORD = var.db_password
     DATABASE_NAME      = "awx"
     RABBITMQ_HOST      = "awx-rabbitmq"
     MEMCACHED_HOST     = "awx-memcached"
-    SECRET_KEY         = "awxsecret"
     AWX_ADMIN_USER     = "admin"
-    AWX_ADMIN_PASSWORD = "awxpassword"
   })
 }
 
@@ -482,13 +479,6 @@ resource "kubernetes_deployment" "awx_task" {
               }
             }
           }
-          # env_from = [{
-          #   name = kubernetes_secret.dbpassword.metadata.0.name
-          # },{
-          #   name = kubernetes_secret.awx_password.metadata.0.name
-          # },{
-          #   name = kubernetes_secret.awx_secret.metadata.0.name
-          # }]
         }
       }
     }
@@ -566,13 +556,6 @@ resource "kubernetes_deployment" "awx_web" {
               }
             }
           }
-          # env_from = [{
-          #   name = kubernetes_secret.dbpassword.metadata.0.name
-          # },{
-          #   name = kubernetes_secret.awx_password.metadata.0.name
-          # },{
-          #   name = kubernetes_secret.awx_secret.metadata.0.name
-          # }]
         }
       }
     }

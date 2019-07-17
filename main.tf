@@ -157,17 +157,14 @@ output "eks" {
   value = module.eks
 }
 
+
 # =============================================
-# Helm - AWX
+# K8s
 # =============================================
 
 locals {
   kube_config_path = "${path.root}/${module.eks.kubeconfig_filename}"
 }
-
-# =============================================
-# K8s
-# =============================================
 
 provider "kubernetes" {
   version     = "~> 1.8.0"
@@ -210,7 +207,7 @@ resource "kubernetes_secret" "awx_secret" {
 # =============================================
 
 locals {
-  nginx_name     = "${var.cluster_name}-nginx"
+  lb_name        = "${var.cluster_name}-lb"
   rabbitmq_name  = "${var.cluster_name}-rabbitmq"
   memcached_name = "${var.cluster_name}-memcached"
   awx_web_name   = "${var.cluster_name}-awx-web"
@@ -220,9 +217,10 @@ locals {
     app = var.cluster_name
   }
 
-  nginx_labels = merge(local.common_labels, {
-    component = "nginx"
-    name      = local.nginx_name
+  lb_labels = merge(local.common_labels, {
+    component                = "load-balancer"
+    "app.kubernetes.io/name" = "alb-ingress-controller"
+    name                     = local.lb_name
   })
 
   rabbitmq_labels = merge(local.common_labels, {
@@ -252,12 +250,12 @@ locals {
   })
 
   awx_env = merge(local.rabbitmq_env, {
-    DATABASE_HOST = module.database.this_rds_cluster_endpoint
-    DATABASE_USER = var.db_username
-    DATABASE_NAME      = "awx"
-    RABBITMQ_HOST      = "awx-rabbitmq"
-    MEMCACHED_HOST     = "awx-memcached"
-    AWX_ADMIN_USER     = "admin"
+    DATABASE_HOST  = module.database.this_rds_cluster_endpoint
+    DATABASE_USER  = var.db_username
+    DATABASE_NAME  = "awx"
+    RABBITMQ_HOST  = "awx-rabbitmq"
+    MEMCACHED_HOST = "awx-memcached"
+    AWX_ADMIN_USER = "admin"
   })
 }
 
@@ -269,73 +267,10 @@ resource "kubernetes_service" "rds_external_service" {
       component = "db"
       name      = "${var.cluster_name}-postgres"
     })
-    annotations = {
-      "kubernetes.io/ingress.class" = "nginx"
-    }
   }
   spec {
     type          = "ExternalName"
     external_name = module.database.this_rds_cluster_endpoint
-  }
-}
-
-
-# nginx
-resource "kubernetes_ingress" "nginx" {
-  metadata {
-    name = local.nginx_name
-  }
-  spec {
-    rule {
-      # host = replace(module.eks.cluster_endpoint, "https://", "")
-      http {
-        path {
-          path = "/"
-          backend {
-            service_name = local.awx_web_name
-            service_port = 80
-          }
-        }
-      }
-    }
-  }
-}
-
-resource "kubernetes_service" "nginx" {
-  metadata {
-    name   = local.nginx_name
-    labels = local.nginx_labels
-  }
-  spec {
-    selector = local.nginx_labels
-    port {
-      port        = 8080
-      target_port = 80
-    }
-  }
-}
-
-resource "kubernetes_deployment" "nginx" {
-  metadata {
-    name   = local.nginx_name
-    labels = local.nginx_labels
-  }
-  spec {
-    replicas = 1
-    selector {
-      match_labels = local.nginx_labels
-    }
-    template {
-      metadata {
-        labels = local.nginx_labels
-      }
-      spec {
-        container {
-          image = "nginx:1.7.8"
-          name  = local.nginx_name
-        }
-      }
-    }
   }
 }
 
@@ -457,7 +392,7 @@ resource "kubernetes_deployment" "awx_task" {
             value_from {
               secret_key_ref {
                 name = kubernetes_secret.dbpassword.metadata.0.name
-                key = "password"
+                key  = "password"
               }
             }
           }
@@ -466,7 +401,7 @@ resource "kubernetes_deployment" "awx_task" {
             value_from {
               secret_key_ref {
                 name = kubernetes_secret.awx_password.metadata.0.name
-                key = "password"
+                key  = "password"
               }
             }
           }
@@ -475,7 +410,7 @@ resource "kubernetes_deployment" "awx_task" {
             value_from {
               secret_key_ref {
                 name = kubernetes_secret.awx_secret.metadata.0.name
-                key = "password"
+                key  = "password"
               }
             }
           }
@@ -496,7 +431,7 @@ resource "kubernetes_service" "awx_web" {
     type     = "NodePort"
     port {
       name        = local.awx_web_name
-      port        = 80
+      port        = 8052
       target_port = 8052
     }
   }
@@ -534,7 +469,7 @@ resource "kubernetes_deployment" "awx_web" {
             value_from {
               secret_key_ref {
                 name = kubernetes_secret.dbpassword.metadata.0.name
-                key = "password"
+                key  = "password"
               }
             }
           }
@@ -543,7 +478,7 @@ resource "kubernetes_deployment" "awx_web" {
             value_from {
               secret_key_ref {
                 name = kubernetes_secret.awx_password.metadata.0.name
-                key = "password"
+                key  = "password"
               }
             }
           }
@@ -552,12 +487,105 @@ resource "kubernetes_deployment" "awx_web" {
             value_from {
               secret_key_ref {
                 name = kubernetes_secret.awx_secret.metadata.0.name
-                key = "password"
+                key  = "password"
               }
             }
           }
         }
       }
     }
+  }
+}
+
+# =============================================
+# DNS
+# =============================================
+
+
+
+resource "aws_lb" "awx" {
+  name               = "awx-lb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [module.eks.worker_security_group_id, module.eks.cluster_security_group_id]
+  subnets            = var.public_subnets
+
+  tags = local.common_tags
+}
+
+resource "aws_lb_target_group" "awx" {
+  name_prefix = substr("${var.cluster_name}-tgtgrp", 0, 6)
+  port        = 8052
+  protocol    = "HTTP"
+  target_type = "instance"
+  vpc_id      = var.vpc_id
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  health_check {
+    interval            = 10
+    path                = "/"
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+
+  tags = local.common_tags
+}
+
+resource "aws_autoscaling_attachment" "awx" {
+  count = length(module.eks.workers_asg_names)
+
+  autoscaling_group_name = module.eks.workers_asg_names[count.index]
+  alb_target_group_arn   = aws_lb_target_group.awx.arn
+}
+
+resource "aws_lb_listener" "awx" {
+  load_balancer_arn = aws_lb.awx.arn
+  port              = 443
+  protocol          = "HTTPS"
+  certificate_arn   = var.alb_ssl_certificate_arn
+  depends_on        = [aws_lb_target_group.awx]
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.awx.arn
+  }
+}
+
+resource "aws_lb_listener_certificate" "awx" {
+  listener_arn    = aws_lb_listener.awx.arn
+  certificate_arn = var.alb_ssl_certificate_arn
+}
+
+resource "aws_lb_listener" "https_redirect" {
+  load_balancer_arn = aws_lb.awx.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type = "redirect"
+
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
+data "aws_route53_zone" "zone" {
+  name = var.route53_zone_name
+}
+
+resource "aws_route53_record" "url" {
+  zone_id = data.aws_route53_zone.zone.zone_id
+  type    = "A"
+  name    = "${var.cluster_name}.${data.aws_route53_zone.zone.name}"
+
+  alias {
+    zone_id = aws_lb.awx.zone_id
+    name = aws_lb.awx.dns_name
+    evaluate_target_health = true
   }
 }

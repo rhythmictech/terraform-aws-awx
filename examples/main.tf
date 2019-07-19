@@ -15,7 +15,7 @@ module "awx" {
   alb_ssl_certificate_arn = var.alb_ssl_certificate_arn
   ecs_instance_type       = var.ecs_instance_type
   tags                    = var.tags
-  route53_zone_name      = var.route53_zone_name
+  route53_zone_name       = var.route53_zone_name
 }
 
 output "alb_dns_name" {

@@ -21,6 +21,8 @@ resource "aws_security_group" "worker_group_mgmt_one" {
       "10.0.0.0/8",
     ]
   }
+
+  tags = local.common_tags
 }
 
 resource "aws_security_group" "worker_group_mgmt_two" {
@@ -36,6 +38,8 @@ resource "aws_security_group" "worker_group_mgmt_two" {
       "192.168.0.0/16",
     ]
   }
+
+  tags = local.common_tags
 }
 
 resource "aws_security_group" "all_worker_mgmt" {
@@ -53,6 +57,21 @@ resource "aws_security_group" "all_worker_mgmt" {
       "192.168.0.0/16",
     ]
   }
+
+  tags = local.common_tags
+}
+
+resource "aws_security_group" "allow_awx" {
+  name_prefix = "allow_awx_"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    from_port = 30052
+    to_port   = 30052
+    protocol  = "tcp"
+  }
+
+  tags = local.common_tags
 }
 
 # =============================================
@@ -140,7 +159,7 @@ module "eks" {
       instance_type                 = "t3.small"
       additional_userdata           = "echo foo bar"
       asg_desired_capacity          = 3
-      additional_security_group_ids = [aws_security_group.worker_group_mgmt_one.id]
+      additional_security_group_ids = [aws_security_group.worker_group_mgmt_one.id, aws_security_group.allow_awx.id]
       # TODO: figure out why this doesn't work
       # tags = merge(local.common_tags, {
       #   propagate_at_launch = true
@@ -433,6 +452,7 @@ resource "kubernetes_service" "awx_web" {
       name        = local.awx_web_name
       port        = 8052
       target_port = 8052
+      node_port   = 30052
     }
   }
 }
@@ -507,7 +527,10 @@ resource "aws_lb" "awx" {
   name               = "awx-lb"
   internal           = false
   load_balancer_type = "application"
-  security_groups    = [module.eks.worker_security_group_id, module.eks.cluster_security_group_id]
+  security_groups    = [
+    module.eks.worker_security_group_id, 
+    module.eks.cluster_security_group_id
+  ]
   subnets            = var.public_subnets
 
   tags = local.common_tags
@@ -515,7 +538,7 @@ resource "aws_lb" "awx" {
 
 resource "aws_lb_target_group" "awx" {
   name_prefix = substr("${var.cluster_name}-tgtgrp", 0, 6)
-  port        = 8052
+  port        = 30052
   protocol    = "HTTP"
   target_type = "instance"
   vpc_id      = var.vpc_id

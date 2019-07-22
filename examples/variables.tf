@@ -9,10 +9,13 @@ locals {
   region     = data.aws_region.current.name
   account_id = data.aws_caller_identity.current.account_id
 
-  common_tags = {
-    env               = var.env
-    terraform_managed = "true"
-  }
+  common_tags = merge({
+    env                 = var.env
+    terraform_managed   = "true"
+    terraform_workspace = terraform.workspace
+    Name                = var.cluster_name
+    }, var.tags
+  )
 }
 
 variable "tags" {

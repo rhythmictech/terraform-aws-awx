@@ -5,7 +5,7 @@ resource "aws_lb_target_group" "awx" {
   name_prefix = substr("${var.cluster_name}-tgtgrp", 0, 6)
   port        = 8052
   protocol    = "HTTP"
-  target_type = "instance"
+  target_type = "ip"
   vpc_id      = var.vpc_id
 
   lifecycle {
@@ -37,7 +37,7 @@ resource "aws_lb_listener" "awx" {
 
 resource "aws_lb_listener" "https_redirect" {
   load_balancer_arn = module.ecs-cluster.alb-arn
-  port              = "80"
+  port              = 8052
   protocol          = "HTTP"
 
   default_action {

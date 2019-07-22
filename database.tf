@@ -16,9 +16,10 @@ module "database" {
 
   vpc_id  = var.vpc_id
   subnets = var.database_subnets
+  # subnets = var.private_subnets
 
-  allowed_security_groups       = [] #TODO
-  allowed_security_groups_count = 0  #TODO
+  allowed_security_groups       = [aws_security_group.ecs_service_egress.id] 
+  allowed_security_groups_count = 1
   instance_type                 = var.db_instance_type
   storage_encrypted             = true
   apply_immediately             = true

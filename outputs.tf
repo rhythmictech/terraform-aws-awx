@@ -2,13 +2,13 @@ output "alb_dns_name" {
   value = module.ecs-cluster.alb-dns
 }
 
-output "awx_task_definition" {
-  value = aws_ecs_task_definition.awx
-}
+# output "awx_task_definition" {
+#   value = aws_ecs_task_definition.awx
+# }
 
-output "awx_ecs_service" {
-  value = aws_ecs_service.awx
-}
+# output "awx_ecs_service" {
+#   value = aws_ecs_service.awx
+# }
 
 output "awx_lb_target_group" {
   value = aws_lb_target_group.awx

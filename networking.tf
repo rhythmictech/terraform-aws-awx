@@ -51,7 +51,7 @@ resource "aws_security_group_rule" "ecs_alb_egress" {
 }
 
 resource "aws_security_group_rule" "ecs_ec2_ingress_from_alb" {
-  security_group_id        = module.ecs-cluster.ec2-sg-id
+  security_group_id        = aws_security_group.ecs_service_egress.id
   type                     = "ingress"
   from_port                = 0
   to_port                  = 0
@@ -70,6 +70,15 @@ resource "aws_security_group" "ecs_service_egress" {
 resource "aws_security_group_rule" "ecs_egress" {
   security_group_id = aws_security_group.ecs_service_egress.id
   type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "allow_all" {
+  security_group_id = aws_security_group.ecs_service_egress.id
+  type              = "ingress"
   from_port         = 0
   to_port           = 0
   protocol          = "-1"

@@ -2,7 +2,9 @@
 # ECS - IAM/Secrets
 # =============================================
 
+# =============================================
 # ECS Task Role 
+# =============================================
 
 resource "aws_iam_role" "execution_role" {
   name               = "${var.cluster_name}-execution-role"
@@ -53,7 +55,9 @@ resource "aws_iam_role_policy" "execution_role_secrets_policy" {
   policy = data.aws_iam_policy_document.execution_role_secrets_policy.json
 }
 
+# =============================================
 # ECS Service Role 
+# =============================================
 
 resource "aws_iam_role" "ecs-service-role" {
   name = "${var.cluster_name}-ecs-service-role"
@@ -109,7 +113,9 @@ data "aws_iam_policy_document" "ecs-instance-policy-document" {
   }
 }
 
+# =============================================
 # ECS EC2 Instances Key
+# =============================================
 
 resource "tls_private_key" "ecs_root" {
   algorithm = "RSA"
@@ -140,7 +146,9 @@ resource "aws_lb_listener_certificate" "awx" {
   certificate_arn = var.alb_ssl_certificate_arn
 }
 
+# =============================================
 # AWX Component Secrets 
+# =============================================
 
 module "db_password" {
   source = "github.com/rhythmictech/terraform-aws-secretsmanager-secret?ref=v0.0.3"

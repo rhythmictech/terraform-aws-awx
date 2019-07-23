@@ -14,6 +14,7 @@ resource "aws_lb_target_group" "awx" {
 
   health_check {
     interval            = 10
+    timeout             = 5
     path                = "/"
     healthy_threshold   = 2
     unhealthy_threshold = 2
@@ -37,7 +38,7 @@ resource "aws_lb_listener" "awx" {
 
 resource "aws_lb_listener" "https_redirect" {
   load_balancer_arn = module.ecs-cluster.alb-arn
-  port              = 8052
+  port              = 80
   protocol          = "HTTP"
 
   default_action {

@@ -78,7 +78,7 @@ variable "db_username" {
 
 variable "db_password" {
   description = "Password for AWX DB user"
-  default     = "password"
+  default     = "Password"
 }
 
 # =============================================

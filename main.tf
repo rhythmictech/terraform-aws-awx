@@ -22,12 +22,24 @@ resource "aws_service_discovery_service" "awx_web" {
       type = "A"
     }
   }
+
+  # health_check_config {
+  #   failure_threshold = 5
+  #   resource_path     = "/"
+  #   type              = "HTTP"
+  # }
+  health_check_custom_config {
+    failure_threshold = 1
+  }
 }
 
 resource "aws_ecs_task_definition" "awx_web" {
-  family             = module.ecs-cluster.cluster-name
-  execution_role_arn = aws_iam_role.execution_role.arn
-  network_mode       = "awsvpc"
+  family                   = module.ecs-cluster.cluster-name
+  execution_role_arn       = aws_iam_role.execution_role.arn
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  memory                   = 2048
+  cpu                      = 1024
 
   container_definitions = templatefile("${path.module}/templates/web_service.json", {
     awx_secret_key_arn     = module.awx_secret_key.secret.arn
@@ -47,10 +59,12 @@ resource "aws_ecs_service" "awx_web" {
   cluster         = module.ecs-cluster.cluster-name
   task_definition = aws_ecs_task_definition.awx_web.arn
   desired_count   = 1
+  launch_type     = "FARGATE"
 
   depends_on = [
     aws_iam_role.ecs-service-role,
-    module.ecs-cluster.cluster-name
+    module.ecs-cluster.cluster-name,
+    aws_service_discovery_service.awx_web
   ]
 
   load_balancer {
@@ -64,8 +78,9 @@ resource "aws_ecs_service" "awx_web" {
   }
 
   network_configuration {
-    subnets         = var.public_subnets
-    security_groups = [aws_security_group.ecs_service_egress.id]
+    subnets          = var.public_subnets
+    security_groups  = [aws_security_group.ecs_service_egress.id]
+    assign_public_ip = true
   }
 }
 

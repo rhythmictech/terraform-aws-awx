@@ -23,11 +23,6 @@ resource "aws_service_discovery_service" "awx_web" {
     }
   }
 
-  # health_check_config {
-  #   failure_threshold = 5
-  #   resource_path     = "/"
-  #   type              = "HTTP"
-  # }
   health_check_custom_config {
     failure_threshold = 1
   }
@@ -90,6 +85,7 @@ resource "aws_ecs_service" "awx_web" {
 
 resource "aws_service_discovery_service" "awx_task" {
   name = "awx"
+
   dns_config {
     namespace_id = aws_service_discovery_private_dns_namespace.awx.id
     dns_records {
@@ -100,9 +96,12 @@ resource "aws_service_discovery_service" "awx_task" {
 }
 
 resource "aws_ecs_task_definition" "awx_task" {
-  family             = module.ecs-cluster.cluster-name
-  execution_role_arn = aws_iam_role.execution_role.arn
-  network_mode       = "awsvpc"
+  family                   = module.ecs-cluster.cluster-name
+  execution_role_arn       = aws_iam_role.execution_role.arn
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  memory                   = 4096
+  cpu                      = 2048
 
   container_definitions = templatefile("${path.module}/templates/task_service.json", {
     awx_secret_key_arn     = module.awx_secret_key.secret.arn
@@ -122,6 +121,7 @@ resource "aws_ecs_service" "awx_task" {
   cluster         = module.ecs-cluster.cluster-name
   task_definition = aws_ecs_task_definition.awx_task.arn
   desired_count   = 1
+  launch_type     = "FARGATE"
 
   depends_on = [
     aws_iam_role.ecs-service-role,

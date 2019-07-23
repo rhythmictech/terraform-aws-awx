@@ -26,18 +26,12 @@ resource "aws_eip" "nat_gateway" {
   tags = local.common_tags
 }
 
-# resource "aws_internet_gateway" "this" {
-#   vpc_id = var.vpc_id
-
-#   # tags = local.common_tags
-# }
 data "aws_internet_gateway" "this" {
   filter {
     name   = "attachment.vpc-id"
     values = ["${var.vpc_id}"]
   }
 }
-
 
 resource "aws_nat_gateway" "this" {
   allocation_id = aws_eip.nat_gateway.id
@@ -61,7 +55,6 @@ resource "aws_route_table" "this" {
 
   tags = local.common_tags
 }
-
 
 # =============================================
 #  INGRESS-EGRESSS

@@ -8,7 +8,7 @@ resource "aws_service_discovery_private_dns_namespace" "awx" {
 }
 
 # =============================================
-# Set up Logs 
+# Logs
 # =============================================
 
 resource "aws_cloudwatch_log_group" "ecs" {
@@ -263,7 +263,6 @@ resource "aws_ecs_service" "awx_cache" {
     security_groups = [aws_security_group.ecs_service_egress.id]
   }
 }
-
 
 # =============================================
 # ECS Cluster 

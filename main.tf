@@ -39,7 +39,7 @@ resource "aws_service_discovery_service" "awx_web" {
 }
 
 resource "aws_ecs_task_definition" "awx_web" {
-  family                   = module.ecs-cluster.cluster-name
+  family                   = var.cluster_name
   execution_role_arn       = aws_iam_role.execution_role.arn
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
@@ -60,15 +60,15 @@ resource "aws_ecs_task_definition" "awx_web" {
 }
 
 resource "aws_ecs_service" "awx_web" {
-  name            = "${module.ecs-cluster.cluster-name}-web"
-  cluster         = module.ecs-cluster.cluster-name
+  name            = "${var.cluster_name}-web"
+  cluster         = var.cluster_name
   task_definition = aws_ecs_task_definition.awx_web.arn
   desired_count   = 1
   launch_type     = "FARGATE"
 
   depends_on = [
     aws_iam_role.ecs-service-role,
-    module.ecs-cluster.cluster-name,
+    aws_ecs_cluster.this,
     aws_service_discovery_service.awx_web
   ]
 
@@ -102,10 +102,14 @@ resource "aws_service_discovery_service" "awx_task" {
       type = "A"
     }
   }
+
+  health_check_custom_config {
+    failure_threshold = 1
+  }
 }
 
 resource "aws_ecs_task_definition" "awx_task" {
-  family                   = module.ecs-cluster.cluster-name
+  family                   = var.cluster_name
   execution_role_arn       = aws_iam_role.execution_role.arn
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
@@ -126,15 +130,16 @@ resource "aws_ecs_task_definition" "awx_task" {
 }
 
 resource "aws_ecs_service" "awx_task" {
-  name            = "${module.ecs-cluster.cluster-name}-task"
-  cluster         = module.ecs-cluster.cluster-name
+  name            = "${var.cluster_name}-task"
+  cluster         = var.cluster_name
   task_definition = aws_ecs_task_definition.awx_task.arn
   desired_count   = 1
   launch_type     = "FARGATE"
 
   depends_on = [
     aws_iam_role.ecs-service-role,
-    module.ecs-cluster.cluster-name
+    aws_ecs_cluster.this,
+    aws_service_discovery_service.awx_task
   ]
 
   service_registries {
@@ -161,10 +166,14 @@ resource "aws_service_discovery_service" "awx_queue" {
       type = "A"
     }
   }
+
+  health_check_custom_config {
+    failure_threshold = 1
+  }
 }
 
 resource "aws_ecs_task_definition" "awx_queue" {
-  family                   = module.ecs-cluster.cluster-name
+  family                   = var.cluster_name
   execution_role_arn       = aws_iam_role.execution_role.arn
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
@@ -177,15 +186,16 @@ resource "aws_ecs_task_definition" "awx_queue" {
 }
 
 resource "aws_ecs_service" "awx_queue" {
-  name            = "${module.ecs-cluster.cluster-name}-queue"
-  cluster         = module.ecs-cluster.cluster-name
+  name            = "${var.cluster_name}-queue"
+  cluster         = var.cluster_name
   task_definition = aws_ecs_task_definition.awx_queue.arn
   desired_count   = 1
   launch_type     = "FARGATE"
 
   depends_on = [
     aws_iam_role.ecs-service-role,
-    module.ecs-cluster.cluster-name
+    aws_ecs_cluster.this,
+    aws_service_discovery_service.awx_queue
   ]
 
   service_registries {
@@ -212,10 +222,14 @@ resource "aws_service_discovery_service" "awx_cache" {
       type = "A"
     }
   }
+
+  health_check_custom_config {
+    failure_threshold = 1
+  }
 }
 
 resource "aws_ecs_task_definition" "awx_cache" {
-  family                   = module.ecs-cluster.cluster-name
+  family                   = var.cluster_name
   execution_role_arn       = aws_iam_role.execution_role.arn
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
@@ -228,15 +242,16 @@ resource "aws_ecs_task_definition" "awx_cache" {
 }
 
 resource "aws_ecs_service" "awx_cache" {
-  name            = "${module.ecs-cluster.cluster-name}-cache"
-  cluster         = module.ecs-cluster.cluster-name
+  name            = "${var.cluster_name}-cache"
+  cluster         = var.cluster_name
   task_definition = aws_ecs_task_definition.awx_cache.arn
   desired_count   = 1
   launch_type     = "FARGATE"
 
   depends_on = [
     aws_iam_role.ecs-service-role,
-    module.ecs-cluster.cluster-name
+    aws_ecs_cluster.this,
+    aws_service_discovery_service.awx_cache
   ]
 
   service_registries {
@@ -254,19 +269,7 @@ resource "aws_ecs_service" "awx_cache" {
 # ECS Cluster 
 # =============================================
 
-module "ecs-cluster" {
-  source                   = "github.com/rhythmictech/terraform-aws-ecs-cluster?ref=1.0.3"
-  name                     = var.cluster_name
-  instance_policy_document = data.aws_iam_policy_document.ecs-instance-policy-document.json
-  vpc_id                   = var.vpc_id
-  alb_subnet_ids           = var.public_subnets
-  instance_subnet_ids      = var.private_subnets
-  ssh_pubkey               = tls_private_key.ecs_root.public_key_openssh
-  instance_type            = var.ecs_instance_type
-  region                   = local.region
-  min_instances            = 0
-  max_instances            = 0
-  desired_instances        = 0
-
+resource "aws_ecs_cluster" "this" {
+  name = var.cluster_name
   tags = local.common_tags
 }

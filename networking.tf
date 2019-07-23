@@ -13,8 +13,8 @@ resource "aws_route53_record" "url" {
   name    = "${var.cluster_name}.${data.aws_route53_zone.zone.name}"
 
   alias {
-    name                   = module.ecs-cluster.alb-dns
-    zone_id                = module.ecs-cluster.alb-zone
+    name                   = aws_lb.this.dns_name
+    zone_id                = aws_lb.this.zone_id
     evaluate_target_health = false
   }
 }
@@ -55,7 +55,7 @@ resource "aws_route_table" "this" {
   vpc_id = var.vpc_id
 
   route { 
-    cidr_block = var.cidr_block
+    cidr_block = "0.0.0.0/0"
     gateway_id = data.aws_internet_gateway.this.id
   }
 
@@ -68,7 +68,7 @@ resource "aws_route_table" "this" {
 # =============================================
 
 resource "aws_security_group_rule" "ecs_alb_ingress_80" {
-  security_group_id = module.ecs-cluster.alb-sg-id
+  security_group_id = aws_security_group.alb.id
   type              = "ingress"
   from_port         = 80
   to_port           = 80
@@ -77,7 +77,7 @@ resource "aws_security_group_rule" "ecs_alb_ingress_80" {
 }
 
 resource "aws_security_group_rule" "ecs_alb_ingress_443" {
-  security_group_id = module.ecs-cluster.alb-sg-id
+  security_group_id = aws_security_group.alb.id
   type              = "ingress"
   from_port         = 443
   to_port           = 443
@@ -86,7 +86,7 @@ resource "aws_security_group_rule" "ecs_alb_ingress_443" {
 }
 
 resource "aws_security_group_rule" "ecs_alb_egress" {
-  security_group_id = module.ecs-cluster.alb-sg-id
+  security_group_id = aws_security_group.alb.id
   type              = "egress"
   from_port         = 0
   to_port           = 0
@@ -100,7 +100,7 @@ resource "aws_security_group_rule" "ecs_ec2_ingress_from_alb" {
   from_port                = 0
   to_port                  = 0
   protocol                 = "-1"
-  source_security_group_id = module.ecs-cluster.alb-sg-id
+  source_security_group_id = aws_security_group.alb.id
 }
 
 resource "aws_security_group" "ecs_service_egress" {

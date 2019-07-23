@@ -1,5 +1,39 @@
 
+# =============================================
 # ALB
+# =============================================
+
+resource "aws_security_group" "alb" {
+  name_prefix = "${var.cluster_name}-lb"
+  vpc_id      = var.vpc_id
+
+  tags = local.common_tags
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+
+resource "aws_lb" "this" {
+  name_prefix        = "${var.cluster_name}-lb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = var.public_subnets
+
+  enable_deletion_protection = false
+
+  # access_logs {
+  #   bucket  = "${aws_s3_bucket.lb_logs.bucket}"
+  #   prefix  = "test-lb"
+  #   enabled = true
+  # }
+
+  tags = local.common_tags
+  lifecycle {
+    create_before_destroy = true
+  }
+}
 
 resource "aws_lb_target_group" "awx" {
   name_prefix = substr("${var.cluster_name}-tgtgrp", 0, 6)
@@ -24,7 +58,7 @@ resource "aws_lb_target_group" "awx" {
 }
 
 resource "aws_lb_listener" "awx" {
-  load_balancer_arn = module.ecs-cluster.alb-arn
+  load_balancer_arn = aws_lb.this.arn
   port              = 443
   protocol          = "HTTPS"
   certificate_arn   = var.alb_ssl_certificate_arn
@@ -37,7 +71,7 @@ resource "aws_lb_listener" "awx" {
 }
 
 resource "aws_lb_listener" "https_redirect" {
-  load_balancer_arn = module.ecs-cluster.alb-arn
+  load_balancer_arn = aws_lb.this.arn
   port              = 80
   protocol          = "HTTP"
 

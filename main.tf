@@ -8,6 +8,16 @@ resource "aws_service_discovery_private_dns_namespace" "awx" {
 }
 
 # =============================================
+# Set up Logs 
+# =============================================
+
+resource "aws_cloudwatch_log_group" "ecs" {
+  name = "/ecs/fargate-task-definition"
+
+  tags = local.common_tags
+}
+
+# =============================================
 # ECS - AWX Web
 # =============================================
 
@@ -73,9 +83,8 @@ resource "aws_ecs_service" "awx_web" {
   }
 
   network_configuration {
-    subnets          = var.public_subnets
+    subnets          = var.private_subnets
     security_groups  = [aws_security_group.ecs_service_egress.id]
-    assign_public_ip = true
   }
 }
 
@@ -133,7 +142,7 @@ resource "aws_ecs_service" "awx_task" {
   }
 
   network_configuration {
-    subnets         = var.public_subnets
+    subnets         = var.private_subnets
     security_groups = [aws_security_group.ecs_service_egress.id]
   }
 }
@@ -144,6 +153,7 @@ resource "aws_ecs_service" "awx_task" {
 
 resource "aws_service_discovery_service" "awx_queue" {
   name = "rabbitmq"
+
   dns_config {
     namespace_id = aws_service_discovery_private_dns_namespace.awx.id
     dns_records {
@@ -154,9 +164,12 @@ resource "aws_service_discovery_service" "awx_queue" {
 }
 
 resource "aws_ecs_task_definition" "awx_queue" {
-  family             = module.ecs-cluster.cluster-name
-  execution_role_arn = aws_iam_role.execution_role.arn
-  network_mode       = "awsvpc"
+  family                   = module.ecs-cluster.cluster-name
+  execution_role_arn       = aws_iam_role.execution_role.arn
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  memory                   = 2048
+  cpu                      = 1024
 
   container_definitions = templatefile("${path.module}/templates/queue_service.json", {})
 
@@ -168,6 +181,7 @@ resource "aws_ecs_service" "awx_queue" {
   cluster         = module.ecs-cluster.cluster-name
   task_definition = aws_ecs_task_definition.awx_queue.arn
   desired_count   = 1
+  launch_type     = "FARGATE"
 
   depends_on = [
     aws_iam_role.ecs-service-role,
@@ -179,7 +193,7 @@ resource "aws_ecs_service" "awx_queue" {
   }
 
   network_configuration {
-    subnets         = var.public_subnets
+    subnets         = var.private_subnets
     security_groups = [aws_security_group.ecs_service_egress.id]
   }
 }
@@ -190,6 +204,7 @@ resource "aws_ecs_service" "awx_queue" {
 
 resource "aws_service_discovery_service" "awx_cache" {
   name = "memcached"
+
   dns_config {
     namespace_id = aws_service_discovery_private_dns_namespace.awx.id
     dns_records {
@@ -200,9 +215,12 @@ resource "aws_service_discovery_service" "awx_cache" {
 }
 
 resource "aws_ecs_task_definition" "awx_cache" {
-  family             = module.ecs-cluster.cluster-name
-  execution_role_arn = aws_iam_role.execution_role.arn
-  network_mode       = "awsvpc"
+  family                   = module.ecs-cluster.cluster-name
+  execution_role_arn       = aws_iam_role.execution_role.arn
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  memory                   = 2048
+  cpu                      = 1024
 
   container_definitions = templatefile("${path.module}/templates/cache_service.json", {})
 
@@ -214,6 +232,7 @@ resource "aws_ecs_service" "awx_cache" {
   cluster         = module.ecs-cluster.cluster-name
   task_definition = aws_ecs_task_definition.awx_cache.arn
   desired_count   = 1
+  launch_type     = "FARGATE"
 
   depends_on = [
     aws_iam_role.ecs-service-role,
@@ -225,7 +244,7 @@ resource "aws_ecs_service" "awx_cache" {
   }
 
   network_configuration {
-    subnets         = var.public_subnets
+    subnets         = var.private_subnets
     security_groups = [aws_security_group.ecs_service_egress.id]
   }
 }
@@ -241,13 +260,13 @@ module "ecs-cluster" {
   instance_policy_document = data.aws_iam_policy_document.ecs-instance-policy-document.json
   vpc_id                   = var.vpc_id
   alb_subnet_ids           = var.public_subnets
-  instance_subnet_ids      = var.public_subnets
+  instance_subnet_ids      = var.private_subnets
   ssh_pubkey               = tls_private_key.ecs_root.public_key_openssh
   instance_type            = var.ecs_instance_type
   region                   = local.region
-  min_instances            = var.ecs_min_instances
-  max_instances            = var.ecs_max_instances
-  desired_instances        = var.ecs_desired_instances
+  min_instances            = 0
+  max_instances            = 0
+  desired_instances        = 0
 
   tags = local.common_tags
 }

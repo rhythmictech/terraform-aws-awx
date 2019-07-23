@@ -1,0 +1,41 @@
+[
+
+    {
+        "name": "rabbitmq",
+        "image": "ansible/awx_rabbitmq:3.7.4",
+        "essential": true,
+        "memory": 1024,
+        "logConfiguration": {
+            "logDriver": "awslogs",
+            "options": {
+                "awslogs-group": "/ecs/fargate-task-definition",
+                "awslogs-region": "us-east-1",
+                "awslogs-stream-prefix": "ecs"
+            }
+        },
+        "portMappings": [
+            {
+                "containerPort": 5672,
+                "hostPort": 5672
+            }
+        ],
+        "environment": [
+            {
+                "name": "RABBITMQ_DEFAULT_VHOST",
+                "value": "awx"
+            },
+            {
+                "name": "RABBITMQ_DEFAULT_USER",
+                "value": "guest"
+            },
+            {
+                "name": "RABBITMQ_DEFAULT_PASS",
+                "value": "awxpass"
+            },
+            {
+                "name": "RABBITMQ_ERLANG_COOKIE",
+                "value": "cookiemonster"
+            }
+        ]
+    }
+]

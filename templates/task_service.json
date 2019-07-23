@@ -1,0 +1,72 @@
+[
+    {
+        "name": "awx",
+        "image": "sblack4/awx_task:v6-b3",
+        "user": "root",
+        "essential": true,
+        "cpu": 2048,
+        "memory": 2000,
+        "logConfiguration": {
+            "logDriver": "awslogs",
+            "options": {
+                "awslogs-group": "/ecs/fargate-task-definition",
+                "awslogs-region": "us-east-1",
+                "awslogs-stream-prefix": "ecs"
+            }
+        },
+        "portMappings": [
+            {
+                "containerPort": 8052,
+                "hostPort": 8052
+            }
+        ],
+        "environment": [
+            {
+                "name": "DATABASE_USER",
+                "value": "${ database_username }"
+            }, 
+            {
+                "name": "DATABASE_HOST",
+                "value": "${ database_host }"
+            },
+            {
+                "name": "AWX_ADMIN_USER",
+                "value": "${ awx_admin_username }"
+            },
+            {
+                "name": "DATABASE_PORT",
+                "value": "5432"
+            },
+            {
+                "name": "MEMCACHED_HOST",
+                "value": "memcached.awx.local"
+            },
+            {
+                "name": "MEMCACHED_PORT",
+                "value": "11211"
+            },
+            {
+                "name": "RABBITMQ_HOST",
+                "value": "rabbitmq.awx.local"
+            },
+            {
+                "name": "RABBITMQ_PORT",
+                "value": "5672"
+            }
+        ],
+        "secrets": [
+            {
+                "name": "DATABASE_PASSWORD",
+                "valueFrom": "${ database_password_arn }"
+            },
+            {
+                "name": "SECRET_KEY",
+                "valueFrom": "${ awx_secret_key_arn }"
+            }, 
+            {
+                "name": "AWX_ADMIN_PASSWORD",
+                "valueFrom": "${ awx_admin_password_arn }"
+            }
+        ]
+    }
+]

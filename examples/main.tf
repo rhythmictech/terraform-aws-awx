@@ -48,6 +48,21 @@ variable "route53_zone_name" {
   type        = string
 }
 
+
+variable "awx_secret_key" {
+  description = "secret key for awx, see docs"
+  default     = "awxsecret"
+}
+
+variable "awx_admin_username" {
+  default = "admin"
+}
+
+variable "awx_admin_password" {
+  default = "awxpassword"
+}
+
+
 variable "tags" {
   description = "User-Defined tags"
   type        = map(string)
@@ -58,6 +73,9 @@ module "awx" {
   source = "../"
 
   cluster_name            = var.cluster_name
+  awx_secret_key          = var.awx_secret_key
+  awx_admin_username      = var.awx_admin_username
+  awx_admin_password      = var.awx_admin_password
   db_instance_type        = var.db_instance_type
   vpc_id                  = var.vpc_id
   cidr_block              = var.cidr_block

@@ -57,64 +57,6 @@ resource "aws_iam_role_policy" "execution_role_secrets_policy" {
 }
 
 # =============================================
-# ECS Service Role 
-# =============================================
-
-# resource "aws_iam_role" "ecs-service-role" {
-#   name = "${var.cluster_name}-ecs-service-role"
-
-#   # necessary to ensure deletion 
-#   force_detach_policies = true
-
-#   assume_role_policy = <<POLICY
-# {
-#   "Version": "2012-10-17",
-#   "Statement": [
-#     {
-#       "Effect": "Allow",
-#       "Principal": {
-#         "Service": "ecs.amazonaws.com"
-#       },
-#       "Action": "sts:AssumeRole"
-#     }
-#   ]
-# }
-# POLICY
-# }
-
-# resource "aws_iam_role_policy_attachment" "ecs-container-service-role-attachment" {
-#   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole"
-#   role = aws_iam_role.ecs-service-role.name
-# }
-
-# resource "aws_iam_role_policy_attachment" "ecs-elb-read-role-attachment" {
-#   policy_arn = "arn:aws:iam::aws:policy/ElasticLoadBalancingReadOnly"
-#   role = aws_iam_role.ecs-service-role.name
-# }
-
-# resource "aws_iam_role_policy_attachment" "ecs-service-role-ec2-read-only" {
-#   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
-#   role = aws_iam_role.ecs-service-role.name
-# }
-
-# resource "aws_iam_role_policy_attachment" "ecs-service-role-route53-read-only" {
-#   policy_arn = "arn:aws:iam::aws:policy/AmazonRoute53ReadOnlyAccess"
-#   role = aws_iam_role.ecs-service-role.name
-# }
-
-# data "aws_iam_policy_document" "ecs-instance-policy-document" {
-#   statement {
-#     actions = [
-#       "rds-db:connect",
-#     ]
-
-#     resources = [
-#       "arn:aws:rds-db:${local.region}:${local.account_id}:dbuser:${module.database.this_rds_cluster_id}/${module.database.this_rds_cluster_master_username}",
-#     ]
-#   }
-# }
-
-# =============================================
 # ECS ALB SSL Cert
 # =============================================
 

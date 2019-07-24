@@ -1,5 +1,5 @@
 # terraform-aws-awx
-Spin up AWX in AWS 
+Spin up AWX in AWS Fargate
 
 ## About 
 
@@ -26,9 +26,17 @@ Add these values into a `.tfvars` file, like below;
 
 ```
 # Required
+
+## ALB of certificate used to secure traffic to ALB
 alb_ssl_certificate_arn = "arn:aws:acm:region:accountid:certificate/hash"
+
+## DNS name to assign ALB handling traffic
 route53_zone_name       = "tower.google.com."
+
+## VPC in which to spin all this up
 vpc_id                  = "vpc-c0ffeffe"
+
+## CIDR Block of VPC
 cidr_block              = "1.234.678.0/20"
 
 database_subnets = [
@@ -49,8 +57,6 @@ private_subnets = [
 
 # Optional
 cluster_name       = "ayy-doubleyou-ex"
-ecs_instance_type  = "t3.large"
-db_password        = "password-up"
 aws_secret_klay    = "myawxsecret"
 awx_admin_password = "myawxadminpassword
 
@@ -59,3 +65,10 @@ tags = {
 }
 ```
 
+This configuration (ignoring fake names) will produce an AWX instance at https://tower.google.com 
+
+## Variables
+Definitive answers in [variables.tf](variables.tf)
+
+## Outputs 
+Definitive answers in [outputs.tf](outputs.tf)

@@ -67,7 +67,6 @@ resource "aws_ecs_service" "awx_web" {
   launch_type     = "FARGATE"
 
   depends_on = [
-    aws_iam_role.ecs-service-role,
     aws_ecs_cluster.this,
     aws_service_discovery_service.awx_web
   ]
@@ -137,7 +136,6 @@ resource "aws_ecs_service" "awx_task" {
   launch_type     = "FARGATE"
 
   depends_on = [
-    aws_iam_role.ecs-service-role,
     aws_ecs_cluster.this,
     aws_service_discovery_service.awx_task
   ]
@@ -193,7 +191,6 @@ resource "aws_ecs_service" "awx_queue" {
   launch_type     = "FARGATE"
 
   depends_on = [
-    aws_iam_role.ecs-service-role,
     aws_ecs_cluster.this,
     aws_service_discovery_service.awx_queue
   ]
@@ -249,7 +246,6 @@ resource "aws_ecs_service" "awx_cache" {
   launch_type     = "FARGATE"
 
   depends_on = [
-    aws_iam_role.ecs-service-role,
     aws_ecs_cluster.this,
     aws_service_discovery_service.awx_cache
   ]

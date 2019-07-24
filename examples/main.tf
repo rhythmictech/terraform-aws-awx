@@ -2,6 +2,58 @@ provider "aws" {
   region = "us-east-1"
 }
 
+variable "cluster_name" {
+  type    = string
+  default = "awx"
+}
+
+variable "db_instance_type" {
+  description = "Instance type used by the Aurora Postgres database"
+  type        = "string"
+  default     = "db.t3.medium"
+}
+
+variable "vpc_id" {
+  description = "VPC ID where resources will be created"
+  type        = string
+}
+
+variable "cidr_block" {
+  description = "VPC IP block"
+  type        = string
+}
+
+variable "database_subnets" {
+  description = "List of subnet IDs where database resides"
+  type        = list(string)
+}
+
+variable "public_subnets" {
+  description = "List of public subnet IDs"
+  type        = list(string)
+}
+
+variable "private_subnets" {
+  description = "List of private subnet IDs"
+  type        = list(string)
+}
+
+variable "alb_ssl_certificate_arn" {
+  description = "ARN for an SSL certificate stored in Certificate Manager to be used with AWX's ALB"
+  type        = string
+}
+
+variable "route53_zone_name" {
+  description = "Name of Route53 Zone in which to put AWX Deployment"
+  type        = string
+}
+
+variable "tags" {
+  description = "User-Defined tags"
+  type        = map(string)
+  default     = {}
+}
+
 module "awx" {
   source = "../"
 
@@ -13,17 +65,8 @@ module "awx" {
   private_subnets         = var.private_subnets
   public_subnets          = var.public_subnets
   alb_ssl_certificate_arn = var.alb_ssl_certificate_arn
-  ecs_instance_type       = var.ecs_instance_type
-  tags                    = var.tags
   route53_zone_name       = var.route53_zone_name
-}
-
-output "alb_dns_name" {
-  value = module.awx.alb_dns_name
-}
-
-output "ecs_private_key" {
-  value = module.awx.ecs_private_key.private_key_pem
+  tags                    = var.tags
 }
 
 output "dns_address" {

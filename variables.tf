@@ -35,7 +35,6 @@ variable "route53_zone_name" {
   type        = string
 }
 
-
 # Networking
 
 variable "vpc_id" {
@@ -76,11 +75,6 @@ variable "db_username" {
   default     = "awx"
 }
 
-variable "db_password" {
-  description = "Password for AWX DB user"
-  default     = "password"
-}
-
 # =============================================
 # AWX Specific
 # =============================================
@@ -107,24 +101,3 @@ variable "awx_admin_username" {
 variable "awx_admin_password" {
   default = "awxpassword"
 }
-
-# ECS 
-
-variable "ecs_instance_type" {
-  description = "Instance type (size) for the EC2 instances which comprise the ECS cluster"
-  type        = string
-  default     = "t3.medium"
-}
-
-variable "ecs_min_instances" {
-  default = 2
-}
-
-variable "ecs_max_instances" {
-  default = 6
-}
-
-variable "ecs_desired_instances" {
-  default = 2
-}
-

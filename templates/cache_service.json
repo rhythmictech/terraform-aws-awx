@@ -1,0 +1,22 @@
+[
+    {
+        "name": "memcached",
+        "image": "memcached:alpine",
+        "essential": true,
+        "memory": 2048,
+        "logConfiguration": {
+            "logDriver": "awslogs",
+            "options": {
+                "awslogs-group": "/ecs/fargate-task-definition",
+                "awslogs-region": "us-east-1",
+                "awslogs-stream-prefix": "ecs"
+            }
+        },
+        "portMappings": [
+            {
+                "containerPort": 11211,
+                "hostPort": 11211
+            }
+        ]
+    }
+]

@@ -48,7 +48,7 @@ resource "aws_nat_gateway" "this" {
 resource "aws_route_table" "this" {
   vpc_id = var.vpc_id
 
-  route { 
+  route {
     cidr_block = "0.0.0.0/0"
     gateway_id = data.aws_internet_gateway.this.id
   }

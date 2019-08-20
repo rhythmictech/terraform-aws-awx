@@ -29,11 +29,6 @@ resource "aws_iam_role_policy_attachment" "execution_role_attachment" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-resource "aws_iam_role_policy_attachment" "execution_role_ec2_read_only" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
-  role = aws_iam_role.execution_role.name
-}
-
 data "aws_iam_policy_document" "execution_role_secrets_policy" {
   statement {
     actions = [
@@ -61,7 +56,7 @@ resource "aws_iam_role_policy" "execution_role_secrets_policy" {
 # =============================================
 
 resource "aws_lb_listener_certificate" "awx" {
-  listener_arn = aws_lb_listener.awx.arn
+  listener_arn    = aws_lb_listener.awx.arn
   certificate_arn = var.alb_ssl_certificate_arn
 }
 
@@ -72,26 +67,26 @@ resource "aws_lb_listener_certificate" "awx" {
 module "db_password" {
   source = "github.com/rhythmictech/terraform-aws-secretsmanager-secret?ref=v0.0.3"
 
-  name = "${var.cluster_name}-db-password"
+  name        = "${var.cluster_name}-db-password"
   description = "RDS password for AWX ECS cluster ${var.cluster_name}"
-  value = module.database.this_rds_cluster_master_password
-  tags = local.common_tags
+  value       = module.database.this_rds_cluster_master_password
+  tags        = local.common_tags
 }
 
 module "awx_secret_key" {
   source = "github.com/rhythmictech/terraform-aws-secretsmanager-secret?ref=v0.0.3"
 
-  name = "${var.cluster_name}-awx-secret"
+  name        = "${var.cluster_name}-awx-secret"
   description = "AWX secret for ${var.cluster_name}"
-  value = var.awx_secret_key
-  tags = local.common_tags
+  value       = var.awx_secret_key
+  tags        = local.common_tags
 }
 
 module "awx_admin_password" {
   source = "github.com/rhythmictech/terraform-aws-secretsmanager-secret?ref=v0.0.3"
 
-  name = "${var.cluster_name}-awx-password"
+  name        = "${var.cluster_name}-awx-password"
   description = "AWX password for ${var.cluster_name}"
-  value = var.awx_admin_password
-  tags = local.common_tags
+  value       = var.awx_admin_password
+  tags        = local.common_tags
 }

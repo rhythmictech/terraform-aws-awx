@@ -1,4 +1,35 @@
 # =============================================
+# AWX Task Role
+# =============================================
+
+resource "aws_iam_role" "awx_task_role" {
+  name               = "${var.cluster_name}-awx-task-role"
+  path               = "/"
+  assume_role_policy = data.aws_iam_policy_document.task_assume_role_policy_document.json
+
+  # necessary to ensure deletion 
+  force_detach_policies = true
+}
+
+data "aws_iam_policy_document" "task_assume_role_policy_document" {
+  statement {
+    actions = [
+      "sts:AssumeRole",
+    ]
+
+    principals {
+      type        = "Service"
+      identifiers = ["ecs-tasks.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "execution_role_ec2_read_only" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
+  role       = aws_iam_role.execution_role.name
+}
+
+# =============================================
 # Service Discovery
 # =============================================
 
@@ -82,8 +113,8 @@ resource "aws_ecs_service" "awx_web" {
   }
 
   network_configuration {
-    subnets          = var.private_subnets
-    security_groups  = [aws_security_group.ecs_service_egress.id]
+    subnets         = var.private_subnets
+    security_groups = [aws_security_group.ecs_service_egress.id]
   }
 }
 
@@ -110,6 +141,7 @@ resource "aws_service_discovery_service" "awx_task" {
 resource "aws_ecs_task_definition" "awx_task" {
   family                   = var.cluster_name
   execution_role_arn       = aws_iam_role.execution_role.arn
+  task_role_arn            = aws_iam_role.awx_task_role.arn
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   memory                   = 4096

@@ -3,13 +3,13 @@ on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: macOS-latest
     steps:
     - uses: actions/checkout@v1
     
     - name: Install prereq
       run: |
-        sudo apt install docker tfenv tflint
+        sudo brew install docker tfenv tflint
         
     - name: tf fmt
       run: |

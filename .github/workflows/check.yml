@@ -10,6 +10,7 @@ jobs:
     - name: Install prereq
       run: |
         brew install docker tfenv tflint
+        tfenv install
         
     - name: tf fmt
       run: |

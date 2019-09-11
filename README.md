@@ -1,4 +1,6 @@
 # terraform-aws-awx
+[![](https://github.com/rhythmictech/terraform-aws-awx/workflows/check/badge.svg)](https://github.com/rhythmictech/terraform-aws-awx/actions)
+
 Spin up AWX in AWS Fargate
 
 ## About 

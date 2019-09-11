@@ -18,7 +18,4 @@ jobs:
     - name: tflint
       run: |
         tflint
-    - name: tf validate
-      run: |
-        terraform validate
    

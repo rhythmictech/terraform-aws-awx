@@ -2,7 +2,7 @@
 
     {
         "name": "rabbitmq",
-        "image": "ansible/awx_rabbitmq:3.7.4",
+        "image": "${ image }",
         "essential": true,
         "memory": 1024,
         "logConfiguration": {

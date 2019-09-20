@@ -1,7 +1,7 @@
 [
     {
         "name": "awxweb",
-        "image": "sblack4/awx_web:v6-b3",
+        "image": "sblack4/awx_task:v6-b3",
         "user": "root",
         "essential": true,
         "memory": 1024,

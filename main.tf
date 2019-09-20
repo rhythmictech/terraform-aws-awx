@@ -78,6 +78,7 @@ resource "aws_ecs_task_definition" "awx_web" {
   cpu                      = 1024
 
   container_definitions = templatefile("${path.module}/templates/web_service.json", {
+    image                  = var.web_container_image
     awx_secret_key_arn     = module.awx_secret_key.secret.arn
     awx_admin_username     = var.awx_admin_username
     awx_admin_password_arn = module.awx_admin_password.secret.arn
@@ -148,6 +149,7 @@ resource "aws_ecs_task_definition" "awx_task" {
   cpu                      = 2048
 
   container_definitions = templatefile("${path.module}/templates/task_service.json", {
+    image                  = var.task_container_image
     awx_secret_key_arn     = module.awx_secret_key.secret.arn
     awx_admin_username     = var.awx_admin_username
     awx_admin_password_arn = module.awx_admin_password.secret.arn
@@ -210,7 +212,9 @@ resource "aws_ecs_task_definition" "awx_queue" {
   memory                   = 2048
   cpu                      = 1024
 
-  container_definitions = templatefile("${path.module}/templates/queue_service.json", {})
+  container_definitions = templatefile("${path.module}/templates/queue_service.json", {
+    image = var.queue_container_image
+  })
 
   tags = local.common_tags
 }
@@ -265,7 +269,9 @@ resource "aws_ecs_task_definition" "awx_cache" {
   memory                   = 2048
   cpu                      = 1024
 
-  container_definitions = templatefile("${path.module}/templates/cache_service.json", {})
+  container_definitions = templatefile("${path.module}/templates/cache_service.json", {
+    image = var.cache_container_image
+  })
 
   tags = local.common_tags
 }

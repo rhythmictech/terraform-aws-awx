@@ -101,3 +101,27 @@ variable "awx_admin_username" {
 variable "awx_admin_password" {
   default = "awxpassword"
 }
+
+variable "cache_container_image" {
+  description = "Memcache container image for Cache"
+  type        = string
+  default     = "memcached:alpine"
+}
+
+variable "queue_container_image" {
+  description = "RabbitMQ container image for queue"
+  type        = string
+  default     = "ansible/awx_rabbitmq:3.7.4"
+}
+
+variable "task_container_image" {
+  description = "AWX task container image"
+  type        = string
+  default     = "sblack4/awx_task:v6-b3"
+}
+
+variable "web_container_image" {
+  description = "AWX Web container image"
+  type        = string
+  default     = "sblack4/awx_web:v6-b3"
+}

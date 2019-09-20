@@ -1,7 +1,7 @@
 [
     {
         "name": "awx",
-        "image": "sblack4/awx_task:v6-b3",
+        "image": "${ image }",
         "user": "root",
         "essential": true,
         "cpu": 2048,
